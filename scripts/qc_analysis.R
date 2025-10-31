@@ -1,0 +1,253 @@
+#!/usr/bin/env Rscript
+quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
+package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
+package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi")
+packages <- c(package_1, package_2)
+invisible(lapply(packages, quiet_library))
+
+option_list <- list(make_option(c("-s", "--sample_sheet"), type = "character", help = "path of the sample sheet", default = NULL),
+                    make_option(c("-o", "--output_dir"),   type = "character", help = "output directory",         default = getwd()),
+                    make_option(c("-p", "--prefix"),       type = "character", help = "output prefix",            default = NULL),
+                    make_option(c("-t", "--threads"),      type = "integer",   help = "number of threads",        default = 64))
+
+opt_parser <- OptionParser(option_list = option_list)
+opt <- parse_args(opt_parser)
+
+if(length(commandArgs(trailingOnly = TRUE)) == 0)
+{
+    print_help(opt_parser)
+    quit(status = 1)
+}
+
+# -- check options -- #
+if(is.null(opt$sample_sheet))         stop("-s, path of the sample sheet is required!", call. = FALSE)
+if(is.null(opt$prefix))               stop("-p, output prefix is required!", call. = FALSE)
+
+#-- function --#
+create_overlap_barcode_plot <- function(list_barcodes, plot_file) {
+    n <- length(list_barcodes)
+    overlap_barcodes <- matrix(0, n, n, dimnames = list(names(list_barcodes), names(list_barcodes)))
+    diag(overlap_barcodes) <- 0
+    invisible(combn(names(list_barcodes), 2, function(p) {
+        i <- p[1]; j <- p[2]
+        overlap_barcodes[i, j] <<- length(intersect(list_barcodes[[i]], list_barcodes[[j]]))
+        overlap_barcodes[j, i] <<- overlap_barcodes[i, j]
+    }))
+
+    png(plot_file, width = 1200, height = 1200, units = "px", res = 200)
+    corrplot(overlap_barcodes, method = "color", type = "full", tl.col = "black", addCoef.col = "black", number.cex = 0.5, col = col_palette, cl.pos = "n", is.corr = FALSE)
+    dev.off()
+}
+
+run_sample_qc <- function(h5file, fragment_file, sample_id) {
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", sample_id, " --> creating the seurat object ...")
+    data <- Read10X_h5(h5file)
+
+    obj <- CreateSeuratObject(counts = data$`Gene Expression`, assay = "RNA")
+    obj[["ATAC"]] <- CreateChromatinAssay(counts = data$Peaks, fragments = fragment_file, annotation = annotations, sep = c(":", "-"))
+    DefaultAssay(obj) <- "RNA"
+
+    rm(data)
+    invisible(gc(verbose = FALSE))
+
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", sample_id, " --> QC RNA ...")
+    obj$qc_rna_status <- "failed"
+    obj$qc_atac_status <- "failed"
+    obj[["percent.mt"]] <- PercentageFeatureSet(obj, pattern = "^MT-")
+    
+    nFeature_low  <- 200
+    nFeature_high <- quantile(obj$nFeature_RNA, 0.99)
+
+    nCount_low  <- 1000
+    nCount_high <- quantile(obj$nCount_RNA, 0.99)
+
+    qc_rna_obj <- subset(obj, subset = nFeature_RNA > nFeature_low & 
+                                       nFeature_RNA < nFeature_high &
+                                       nCount_RNA > nCount_low &
+                                       nCount_RNA < nCount_high &
+                                       percent.mt < 10)
+    qc_rna_obj$qc_rna_status <- "passed"
+    obj$qc_rna_status[colnames(qc_rna_obj)] <- "passed"
+
+    plot_file <- file.path(qc_dir, paste0(sample_id, ".qc_rna_violin.png"))
+    p <- VlnPlot(obj, 
+                 features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), 
+                 group.by = "qc_rna_status", 
+                 cols = c("skyblue","yellowgreen"),
+                 pt.size = 0, 
+                 ncol = 3)
+    ggsave(plot_file, p, width = 10, height = 8)
+
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", sample_id, " --> QC ATAC ...")
+    DefaultAssay(qc_rna_obj) <- "ATAC"
+    qc_rna_obj <- NucleosomeSignal(qc_rna_obj)
+    qc_rna_obj <- TSSEnrichment(qc_rna_obj)
+
+    nCount_ATAC_low  <- 1000
+    nCount_ATAC_high <- quantile(qc_rna_obj$nCount_ATAC, 0.99)
+
+    tss_enrichment_low  <- 2
+
+    qc_atac_obj <- subset(qc_rna_obj, subset = nCount_ATAC > nCount_ATAC_low & 
+                                               nCount_ATAC < nCount_ATAC_high & 
+                                               TSS.enrichment > tss_enrichment_low)
+
+    qc_atac_obj$qc_atac_status <- "passed"
+    qc_rna_obj$qc_atac_status[colnames(qc_atac_obj)] <- "passed"
+
+    plot_file <- file.path(qc_dir, paste0(sample_id, ".qc_atac_violin.png"))
+    p <- VlnPlot(qc_rna_obj, 
+                 features = c("nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
+                 group.by = "qc_atac_status", 
+                 cols = c("skyblue","yellowgreen"),
+                 pt.size = 0, 
+                 ncol = 3)
+    ggsave(plot_file, p, width = 10, height = 8)
+    
+    dt_summary <- data.table(sample_id                  = c(sample_id, sample_id, sample_id),
+                             qc_type                    = c("raw", "after_qc_rna", "after_qc_atac"),
+                             n_reads_rna                = c(sum(obj@meta.data$nCount_RNA), 
+                                                            sum(qc_rna_obj@meta.data$nCount_RNA),
+                                                            sum(qc_atac_obj@meta.data$nCount_RNA)),
+                             n_reads_atac               = c(sum(obj@meta.data$nCount_ATAC), 
+                                                            sum(qc_rna_obj@meta.data$nCount_ATAC),
+                                                            sum(qc_atac_obj@meta.data$nCount_ATAC)),
+                             n_cells                    = c(nrow(obj@meta.data), 
+                                                            nrow(qc_rna_obj@meta.data),
+                                                            nrow(qc_atac_obj@meta.data)),
+                             n_features_per_cell_median = c(median(obj@meta.data$nFeature_RNA), 
+                                                            median(qc_rna_obj@meta.data$nFeature_RNA),
+                                                            median(qc_atac_obj@meta.data$nFeature_RNA)),
+                             n_reads_per_cell_median    = c(median(obj@meta.data$nCount_RNA), 
+                                                            median(qc_rna_obj@meta.data$nCount_RNA),
+                                                            median(qc_atac_obj@meta.data$nCount_RNA)),
+                             pct_mito_per_cell_median   = c(median(obj@meta.data$percent.mt), 
+                                                            median(qc_rna_obj@meta.data$percent.mt),
+                                                            median(qc_atac_obj@meta.data$percent.mt)),
+                             tss_enrichment_median      = c(NA, 
+                                                            median(qc_rna_obj@meta.data$TSS.enrichment),
+                                                            median(qc_atac_obj@meta.data$TSS.enrichment)),
+                             nucleosome_signal_median   = c(NA,
+                                                            median(qc_rna_obj@meta.data$nucleosome_signal),
+                                                            median(qc_atac_obj@meta.data$nucleosome_signal)))
+
+    rm(obj)
+    rm(qc_rna_obj)
+    invisible(gc(verbose = FALSE))
+
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", sample_id, " --> normailizing counts ...")
+    qc_atac_obj <- RunTFIDF(qc_atac_obj)
+    qc_atac_obj <- FindTopFeatures(qc_atac_obj, min.cutoff = "q0")
+
+    DefaultAssay(qc_atac_obj) <- "RNA"
+    qc_atac_obj <- SCTransform(qc_atac_obj, verbose = FALSE)
+    qc_atac_obj <- FindVariableFeatures(qc_atac_obj, selection.method = "vst", nfeatures = 3000)
+
+    return(list(qc_seurat_obj = qc_atac_obj, dt_summary = dt_summary))
+}
+
+
+# -- inputs -- #
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Reading input files ...")
+
+annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
+seqlevelsStyle(annotations) <- "UCSC"
+
+samples <- fread(opt$sample_sheet, header = TRUE, sep = "\t")
+
+col_palette <- colorRampPalette(c("white", "brown1"))(100)
+
+# -- outputs -- #
+if(!dir.exists(opt$output_dir)) dir.create(opt$output_dir, recursive = TRUE)
+setwd(opt$output_dir)
+
+sample_prefix <- opt$prefix
+
+qc_dir <- "1_qc_results"
+if (!dir.exists(qc_dir)) dir.create(qc_dir)
+
+#-- processing --#
+list_barcodes <- list()
+list_h5_paths <- list()
+list_fragments <- list()
+for(i in seq_along(samples$sample_id)) {
+    list_barcodes[[samples$sample_id[i]]] <- fread(paste0(samples$cellranger_dir[i], "/per_barcode_metrics.csv"), header = TRUE, sep = ",", select = c("barcode", "is_cell"))
+    list_barcodes[[samples$sample_id[i]]] <- list_barcodes[[samples$sample_id[i]]][is_cell == 1]$barcode
+
+    list_h5_paths[[samples$sample_id[i]]] <- paste0(samples$cellranger_dir[i], "/filtered_feature_bc_matrix.h5")
+    list_fragments[[samples$sample_id[i]]] <- paste0(samples$cellranger_dir[i], "/atac_fragments.tsv.gz")
+}
+    
+# -- processing -- #
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Checking barcodes ...")
+
+# 1. barcode checking
+plot_file <- file.path(qc_dir, paste0(sample_prefix, ".overlapped_barcodes.png"))
+create_overlap_barcode_plot(list_barcodes, plot_file)
+
+rm(list_barcodes)
+invisible(gc(verbose = FALSE))
+
+# 2. QC for each sample
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC ...")
+
+# parallel processing needs lots of MEM, like ~600GB here, not effeicient for the job, so using loop here 
+# plan(multicore, workers = opt$threads) 
+# future_res <- future_mapply(run_sample_qc, h5file = list_h5_paths, fragment_file = list_fragments, sample_id = names(list_h5_paths), SIMPLIFY = FALSE)
+# qc_seurat_objs <- map(future_res, "qc_seurat_obj")
+# qc_summary <- rbindlist(map(future_res, "dt_summary"))
+
+qc_seurat_objs <- list()
+qc_summary <- data.table()
+for(i in seq_along(samples$sample_id)) {
+    idx <- samples$sample_id[i]
+    qc_results <- run_sample_qc(list_h5_paths[[idx]], list_fragments[[idx]], idx)
+    qc_seurat_objs[[idx]] <- qc_results$qc_seurat_obj
+    qc_summary <- rbindlist(list(qc_summary, qc_results$dt_summary), use.names = TRUE, fill = TRUE)
+}
+
+fwrite(qc_summary, file = file.path(qc_dir, paste0(sample_prefix, ".qc_summary.tsv")), sep = "\t")
+saveRDS(qc_seurat_objs, file = file.path(qc_dir, paste0(sample_prefix, ".qc_seurat_objs.rds")))
+
+list_qc_barcodes <- lapply(qc_seurat_objs, colnames)
+plot_file <- file.path(qc_dir, paste0(sample_prefix, ".qc_overlapped_barcodes.png"))
+create_overlap_barcode_plot(list_qc_barcodes, plot_file)
+
+dt_cell_barcodes <- as.data.table(stack(list_qc_barcodes))
+dt_cell_barcodes <- dt_cell_barcodes[, .(count = .N, samples = paste(ind, collapse = ",")), by = values]
+dt_cell_barcodes_overlap <- dt_cell_barcodes[count > 1]
+setorder(dt_cell_barcodes_overlap, -count, values)
+fwrite(dt_cell_barcodes_overlap, file = file.path(qc_dir, paste0(sample_prefix, ".qc_overlapped_barcodes.tsv")), sep = "\t")
+
+rm(list_qc_barcodes)
+invisible(gc(verbose = FALSE))
+
+
+
+
+
+
+
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Removing batch effects ...")
+features <- SelectIntegrationFeatures(object.list = qc_seurat_objs, nfeatures = 3000)
+qc_seurat_objs <- lapply(qc_seurat_objs, function(obj) { 
+    obj <- ScaleData(obj, features = features)
+    obj <- RunPCA(obj, features = features)
+    return(obj)
+})
+anchors <- FindIntegrationAnchors(object.list = qc_seurat_objs, anchor.features = features, dims = 1:30)
+integrated_obj <- IntegrateData(anchorset = anchors, dims = 1:30)
+saveRDS(integrated_obj, file = file.path(qc_dir, paste0(sample_prefix, ".integrated_obj.rds")))
+
+
+DefaultAssay(integrated_obj) <- "integrated"
+integrated_obj <- ScaleData(integrated_obj, verbose = FALSE)
+integrated_obj <- RunPCA(integrated_obj, npcs = 30, verbose = FALSE)
+integrated_obj <- RunUMAP(integrated_obj, dims = 1:30)
+integrated_obj <- FindNeighbors(integrated_obj, dims = 1:30)
+integrated_obj <- FindClusters(integrated_obj, resolution = 0.5)
+
+DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+
+rm(qc_seurat_objs)
+invisible(gc(verbose = FALSE))
