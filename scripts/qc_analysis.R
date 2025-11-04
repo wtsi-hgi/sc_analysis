@@ -245,7 +245,7 @@ integrated_obj <- integrated_obj[, !dup_cells]
 colnames(integrated_obj) <- new_names[!dup_cells]
 cells_in_obj <- colnames(integrated_obj)
 
-tf_barcodes_umi_top10 <- fread(opt$sample_sheet, sep = "\t", header = T)
+tf_barcodes_umi_top10 <- fread(opt$tf_barcode, sep = "\t", header = T)
 tf_barcodes_umi_top10 <- tf_barcodes_umi_top10[cell_barcode %in% cells_in_obj]
 missing_cells <- setdiff(cells_in_obj, tf_barcodes_umi_top10$cell_barcode)
 
