@@ -5,10 +5,11 @@ package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
-option_list <- list(make_option(c("-s", "--sample_sheet"), type = "character", help = "path of the sample sheet", default = NULL),
-                    make_option(c("-o", "--output_dir"),   type = "character", help = "output directory",         default = getwd()),
-                    make_option(c("-p", "--prefix"),       type = "character", help = "output prefix",            default = NULL),
-                    make_option(c("-t", "--threads"),      type = "integer",   help = "number of threads",        default = 64))
+option_list <- list(make_option(c("-s", "--sample_sheet"), type = "character", help = "path of the sample sheet",    default = NULL),
+                    make_option(c("-b", "--tf_barcode"),   type = "character", help = "path of the TF barcode file", default = NULL),
+                    make_option(c("-o", "--output_dir"),   type = "character", help = "output directory",            default = getwd()),
+                    make_option(c("-p", "--prefix"),       type = "character", help = "output prefix",               default = NULL),
+                    make_option(c("-t", "--threads"),      type = "integer",   help = "number of threads",           default = 64))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -141,7 +142,6 @@ run_sample_qc <- function(h5file, fragment_file, sample_id) {
 
     DefaultAssay(qc_atac_obj) <- "RNA"
     qc_atac_obj <- SCTransform(qc_atac_obj, verbose = FALSE)
-    qc_atac_obj <- FindVariableFeatures(qc_atac_obj, selection.method = "vst", nfeatures = 3000)
 
     return(list(qc_seurat_obj = qc_atac_obj, dt_summary = dt_summary))
 }
@@ -219,35 +219,58 @@ dt_cell_barcodes_overlap <- dt_cell_barcodes[count > 1]
 setorder(dt_cell_barcodes_overlap, -count, values)
 fwrite(dt_cell_barcodes_overlap, file = file.path(qc_dir, paste0(sample_prefix, ".qc_overlapped_barcodes.tsv")), sep = "\t")
 
+qc_seurat_objs_unique <- lapply(qc_seurat_objs, function(obj) {
+    keep <- !colnames(obj) %in% overlapped
+    obj[, keep]
+})
+saveRDS(qc_seurat_objs_unique, file = file.path(qc_dir, paste0(sample_prefix, ".qc_seurat_objs.unique_cells.rds")))
+
 rm(list_qc_barcodes)
+rm(qc_seurat_objs)
 invisible(gc(verbose = FALSE))
-
-
-
-
-
-
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Removing batch effects ...")
 features <- SelectIntegrationFeatures(object.list = qc_seurat_objs, nfeatures = 3000)
-qc_seurat_objs <- lapply(qc_seurat_objs, function(obj) { 
-    obj <- ScaleData(obj, features = features)
-    obj <- RunPCA(obj, features = features)
-    return(obj)
-})
-anchors <- FindIntegrationAnchors(object.list = qc_seurat_objs, anchor.features = features, dims = 1:30)
-integrated_obj <- IntegrateData(anchorset = anchors, dims = 1:30)
-saveRDS(integrated_obj, file = file.path(qc_dir, paste0(sample_prefix, ".integrated_obj.rds")))
-
-
-DefaultAssay(integrated_obj) <- "integrated"
-integrated_obj <- ScaleData(integrated_obj, verbose = FALSE)
-integrated_obj <- RunPCA(integrated_obj, npcs = 30, verbose = FALSE)
-integrated_obj <- RunUMAP(integrated_obj, dims = 1:30)
-integrated_obj <- FindNeighbors(integrated_obj, dims = 1:30)
-integrated_obj <- FindClusters(integrated_obj, resolution = 0.5)
-
-DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+qc_seurat_objs <- PrepSCTIntegration(object.list = qc_seurat_objs, anchor.features = features)
+anchors <- FindIntegrationAnchors(object.list = qc_seurat_objs, normalization.method = "SCT", anchor.features = features)
+integrated_obj <- IntegrateData(anchorset = anchors, normalization.method = "SCT")
 
 rm(qc_seurat_objs)
 invisible(gc(verbose = FALSE))
+
+old_names <- colnames(integrated_obj)
+new_names <- sub("-1_.*$", "", old_names)
+dup_cells <- duplicated(new_names)
+integrated_obj <- integrated_obj[, !dup_cells]
+colnames(integrated_obj) <- new_names[!dup_cells]
+cells_in_obj <- colnames(integrated_obj)
+
+tf_barcodes_umi_top10 <- fread(opt$sample_sheet, sep = "\t", header = T)
+tf_barcodes_umi_top10 <- tf_barcodes_umi_top10[cell_barcode %in% cells_in_obj]
+missing_cells <- setdiff(cells_in_obj, tf_barcodes_umi_top10$cell_barcode)
+
+integrated_obj <- subset(integrated_obj, cells = setdiff(colnames(integrated_obj), missing_cells))
+
+tf_mat <- dcast(tf_barcodes_umi_top10, tf_name ~ cell_barcode, value.var = "umi_count", fill = 0)
+tf_mat <- tf_mat[!is.na(tf_name)]
+tf_mat <- as.data.frame(tf_mat)
+rownames(tf_mat) <- tf_mat$tf_name
+tf_mat$tf_name <- NULL
+tf_mat <- as.matrix(tf_mat[, colnames(integrated_obj)])
+
+tf_assay <- CreateAssayObject(data = tf_mat)
+integrated_obj[["TF"]] <- tf_assay
+integrated_obj[["TF"]]@counts <- tf_mat
+DefaultAssay(integrated_obj) <- "TF"
+integrated_obj <- SCTransform(integrated_obj, assay = "TF", new.assay.name = "SCT_TF", verbose = FALSE)
+
+DefaultAssay(integrated_obj) <- "integrated"
+integrated_obj <- FindVariableFeatures(integrated_obj, assay = "integrated", selection.method = "vst", nfeatures = 3000)
+integrated_obj <- ScaleData(integrated_obj, assay = "integrated", verbose = FALSE)
+integrated_obj <- RunPCA(integrated_obj, assay = "integrated", npcs = 30, verbose = FALSE)
+integrated_obj <- RunUMAP(integrated_obj, assay = "integrated", dims = 1:30)
+integrated_obj <- FindNeighbors(integrated_obj, assay = "integrated", dims = 1:30)
+integrated_obj <- FindClusters(integrated_obj, algorithm = 1, assay = "integrated", resolution = 0.5)
+
+saveRDS(integrated_obj, file = file.path(qc_dir, paste0(sample_prefix, ".integrated_obj.rds")))
+# DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
