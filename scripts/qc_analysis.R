@@ -9,7 +9,7 @@ option_list <- list(make_option(c("-s", "--sample_sheet"), type = "character", h
                     make_option(c("-b", "--tf_barcode"),   type = "character", help = "path of the TF barcode file", default = NULL),
                     make_option(c("-o", "--output_dir"),   type = "character", help = "output directory",            default = getwd()),
                     make_option(c("-p", "--prefix"),       type = "character", help = "output prefix",               default = NULL),
-                    make_option(c("-t", "--threads"),      type = "integer",   help = "number of threads",           default = 64))
+                    make_option(c("-t", "--threads"),      type = "integer",   help = "number of threads",           default = 1))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -177,11 +177,9 @@ for(i in seq_along(samples$sample_id)) {
     list_h5_paths[[samples$sample_id[i]]] <- paste0(samples$cellranger_dir[i], "/filtered_feature_bc_matrix.h5")
     list_fragments[[samples$sample_id[i]]] <- paste0(samples$cellranger_dir[i], "/atac_fragments.tsv.gz")
 }
-    
-# -- processing -- #
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Checking barcodes ...")
 
 # 1. barcode checking
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Checking barcodes ...")
 plot_file <- file.path(qc_dir, paste0(sample_prefix, ".overlapped_barcodes.png"))
 create_overlap_barcode_plot(list_barcodes, plot_file)
 
@@ -207,7 +205,6 @@ for(i in seq_along(samples$sample_id)) {
 }
 
 fwrite(qc_summary, file = file.path(qc_dir, paste0(sample_prefix, ".qc_summary.tsv")), sep = "\t")
-saveRDS(qc_seurat_objs, file = file.path(qc_dir, paste0(sample_prefix, ".qc_seurat_objs.rds")))
 
 list_qc_barcodes <- lapply(qc_seurat_objs, colnames)
 plot_file <- file.path(qc_dir, paste0(sample_prefix, ".qc_overlapped_barcodes.png"))
@@ -219,14 +216,13 @@ dt_cell_barcodes_overlap <- dt_cell_barcodes[count > 1]
 setorder(dt_cell_barcodes_overlap, -count, values)
 fwrite(dt_cell_barcodes_overlap, file = file.path(qc_dir, paste0(sample_prefix, ".qc_overlapped_barcodes.tsv")), sep = "\t")
 
-qc_seurat_objs_unique <- lapply(qc_seurat_objs, function(obj) {
-    keep <- !colnames(obj) %in% overlapped
+qc_seurat_objs <- lapply(qc_seurat_objs, function(obj) {
+    keep <- !colnames(obj) %in% dt_cell_barcodes_overlap$values
     obj[, keep]
 })
-saveRDS(qc_seurat_objs_unique, file = file.path(qc_dir, paste0(sample_prefix, ".qc_seurat_objs.unique_cells.rds")))
+saveRDS(qc_seurat_objs, file = file.path(qc_dir, paste0(sample_prefix, ".qc_seurat_objs.unique_cells.rds")))
 
 rm(list_qc_barcodes)
-rm(qc_seurat_objs)
 invisible(gc(verbose = FALSE))
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Removing batch effects ...")
