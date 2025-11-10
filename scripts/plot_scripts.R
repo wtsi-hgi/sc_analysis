@@ -37,7 +37,7 @@ tf_count_a1 <- tf_count_a1[order(-count), .SD[1], by = .(cell_barcode, read_umi)
 tf_count_a1_umi <- tf_count_a1[, .(umi_count = uniqueN(read_umi)), by = .(cell_barcode, tf_name)]
 tf_count_a1_umi_a1 <- tf_count_a1_umi[umi_count > 1]
 
-fwrite(tf_count_a1_umi_a1, "morf10_tf.umi_filtered.tsv", row.names = F, sep = "\t")
+fwrite(tf_count_a1_umi_a1, "morf10_tf.umi_filtered.a1.tsv", row.names = F, sep = "\t")
 
 tf_count_a1_umi_n_tf <- tf_count_a1_umi[, .(n_tf       = uniqueN(tf_name), 
                                             mean_umi   = as.numeric(mean(umi_count)), 
@@ -111,6 +111,19 @@ ggplot(tf_count_a1_umi_plot2, aes(x = tf_rank, y = umi_count, group = cell_barco
     theme(axis.text = element_text(size = 8, face = "bold")) +
     labs(x = "TF rank (per cell)", y = "UMI count")
 
+tf_count_a1_umi_boxplot <- melt(tf_count_a1_umi_n_tf, 
+                                id.vars = c("cell_barcode", "tf_bin"), 
+                                measure.vars = c("mean_umi", "median_umi"),
+                                variable.name = "umi_type", value.name = "umi_value")
+ggplot(tf_count_a1_umi_boxplot, aes(x = tf_bin, y = umi_value, fill = umi_type)) +
+    geom_boxplot(outlier.size = 0.5, position = position_dodge(width = 0.8), outlier.colour = "darkgrey", linewidth = 0.1) +
+    scale_y_log10() +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "TF Bin", y = "UMI", title = "UMI by TF Bin")
+
 tf_count_a1_umi_a1_n_tf[, tf_bin := cut(n_tf, breaks = bin_values, labels = bin_labels, right=FALSE)]
 tf_count_a1_umi_a1_plot <- merge(tf_count_a1_umi_a1, tf_count_a1_umi_a1_n_tf[, .(cell_barcode, tf_bin)], by = "cell_barcode")
 cell_counts <- unique(tf_count_a1_umi_a1_plot[, .(cell_barcode, tf_bin)])
@@ -148,3 +161,67 @@ ggplot(tf_count_a1_umi_a1_plot2, aes(x = tf_rank, y = umi_count, group = cell_ba
     theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
     theme(axis.text = element_text(size = 8, face = "bold")) +
     labs(x = "TF rank (per cell)", y = "UMI count")
+
+tf_count_a1_umi_a1_boxplot <- melt(tf_count_a1_umi_a1_n_tf, 
+                                   id.vars = c("cell_barcode", "tf_bin"), 
+                                   measure.vars = c("mean_umi", "median_umi"),
+                                   variable.name = "umi_type", value.name = "umi_value")
+ggplot(tf_count_a1_umi_a1_boxplot, aes(x = tf_bin, y = umi_value, fill = umi_type)) +
+    geom_boxplot(outlier.size = 0.5, position = position_dodge(width = 0.8), outlier.colour = "darkgrey", linewidth = 0.1) +
+    scale_y_log10() +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "TF Bin", y = "UMI", title = "UMI by TF Bin")
+
+tf_count_a1_umi_a1_top10 <- tf_count_a1_umi_a1[, {if (.N > 10) .SD[order(-umi_count)][1:10] else .SD}, by = cell_barcode]
+fwrite(tf_count_a1_umi_a1_top10, "morf10_tf.umi_filtered.a1.top10.tsv", row.names = F, sep = "\t")
+
+tf_count_a1_umi_a1_top10_n_tf <- tf_count_a1_umi_a1_top10[, .(n_tf       = uniqueN(tf_name), 
+                                                              mean_umi   = as.numeric(mean(umi_count)), 
+                                                              median_umi = as.numeric(median(umi_count))), by = .(cell_barcode)]
+tf_count_a1_umi_a1_top10_boxplot <- melt(tf_count_a1_umi_a1_top10_n_tf, 
+                                         id.vars = c("cell_barcode", "n_tf"), 
+                                         measure.vars = c("mean_umi", "median_umi"),
+                                         variable.name = "umi_type", value.name = "umi_value")
+ggplot(tf_count_a1_umi_a1_top10_boxplot, aes(x = factor(n_tf), y = umi_value, fill = umi_type)) +
+    geom_boxplot(outlier.size = 0.5, position = position_dodge(width = 0.8), outlier.colour = "darkgrey", linewidth = 0.1) +
+    scale_y_log10() +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "TF Bin", y = "UMI", title = "UMI by TF Bin")
+
+tf_count_a1_umi_a1_top10_cells <- tf_count_a1_umi_a1_top10[, .(n_cells = uniqueN(cell_barcode), 
+                                                               mean_umi = as.numeric(mean(umi_count)),
+                                                               median_umi = as.numeric(median(umi_count))), by = tf_name]
+bin_values <- c(0, seq(20, 100, 20), seq(200, 600, 100), 800, 1000, 1200, 1500, Inf)
+bin_labels <- c("1~20",     "20~40",     "40~60",     "60~80",    "80~100",
+                "100~200",  "200~300",   "300~400",   "400~500",  "500~600", 
+                "600~800",  "800~1000", "1000~1200", "1200~1500", "1500+")
+tf_count_a1_umi_a1_top10_cells[, cell_bin := cut(n_cells, breaks = bin_values, labels = bin_labels, right = FALSE)]
+tf_count_a1_umi_a1_top10_cells_sum <- tf_count_a1_umi_a1_top10_cells[, .N, by = cell_bin]
+
+tf_count_a1_umi_a1_top10_cells_boxplot <- melt(tf_count_a1_umi_a1_top10_cells, 
+                                               id.vars = c("tf_name", "n_cells", "cell_bin"),
+                                               measure.vars = c("mean_umi", "median_umi"),
+                                               variable.name = "umi_type", value.name = "umi_value")
+ggplot(tf_count_a1_umi_a1_top10_cells_boxplot, aes(x = cell_bin, y = umi_value, fill = umi_type)) +
+    geom_boxplot(outlier.size = 0.5, position = position_dodge(width = 0.8), outlier.colour = "darkgrey", linewidth = 0.1) +
+    scale_y_log10() +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "Cell Number Bin", y = "Mean UMI Per TF", title = "UMI by Cell Number Bin")
+
+ggplot(tf_count_a1_umi_a1_top10_cells_sum, aes(x = cell_bin, y = N)) +
+    geom_bar(stat = "identity", fill = "yellowgreen", color = "black", linewidth = 0.1) +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "Cell Number Bin", y = "No. of TFs", title = "No. of TFs by Cell Number Bin")
+  
