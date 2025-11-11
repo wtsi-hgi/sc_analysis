@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
-package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi")
+package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrapper")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
@@ -270,3 +270,56 @@ integrated_obj <- FindClusters(integrated_obj, algorithm = 1, assay = "integrate
 
 saveRDS(integrated_obj, file = file.path(qc_dir, paste0(sample_prefix, ".integrated_obj.rds")))
 # DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+
+FeaturePlot(integrated_obj, features = "PC_1")
+
+gene_marks_cluster17 <- FindMarkers(integrated_obj,
+                                    ident.1 = 17,
+                                    assay = "SCT",       
+                                    only.pos = TRUE,        
+                                    logfc.threshold = 0.25,
+                                    min.pct = 0.10)
+tf_marks_cluster17 <- FindMarkers(integrated_obj,
+                                  ident.1 = 17,
+                                  assay = "SCT_TF",       
+                                  only.pos = TRUE,        
+                                  logfc.threshold = 0.25,
+                                  min.pct = 0.01)
+
+gene_marks_cluster17_sig <- gene_marks_cluster17 %>%
+                            rownames_to_column(var = "gene") %>%
+                            dplyr::filter(p_val_adj < 0.05 & avg_log2FC > 0.25)
+
+cds <- as.cell_data_set(integrated_obj)
+reducedDim(cds, "UMAP") <- integrated_obj@reductions$umap@cell.embeddings
+cds@clusters$UMAP$clusters <- as.factor(integrated_obj$seurat_clusters)
+names(cds@clusters$UMAP$clusters) <- colnames(cds)
+cds@clusters$UMAP$partitions <- rep(1, ncol(cds))
+names(cds@clusters$UMAP$partitions) <- colnames(cds)
+cds <- learn_graph(cds)
+
+root_cells <- colnames(cds)[cds@clusters$UMAP$clusters == "17"]
+cds <- order_cells(cds, root_cells = root_cells)
+plot_cells(cds, color_cells_by = "pseudotime", show_trajectory_graph = F)
+
+gene_marks_cluster17_sig <- gene_marks_cluster17 %>%
+                            rownames_to_column(var = "gene") %>%
+                            dplyr::filter(p_val_adj < 0.05 & avg_log2FC > 0.25)
+
+
+genes_entrez <- bitr(gene_marks_cluster17_sig$gene, fromType = "SYMBOL",
+                     toType = "ENTREZID",
+                     OrgDb = org.Hs.eg.db)
+ego <- enrichGO(gene          = genes_entrez$ENTREZID,
+                OrgDb         = org.Hs.eg.db,
+                keyType       = "ENTREZID",
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                qvalueCutoff  = 0.05,
+                readable      = TRUE)
+
+barplot(ego, showCategory = 20)
+dotplot(ego, showCategory = 20)
+emapplot(ego)
+
+go_results <- as.data.frame(ego)
