@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
-package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrapper")
+package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
