@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
-package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers")
+package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
@@ -269,9 +269,109 @@ integrated_obj <- FindNeighbors(integrated_obj, assay = "integrated", dims = 1:3
 integrated_obj <- FindClusters(integrated_obj, algorithm = 1, assay = "integrated", resolution = 0.5)
 
 saveRDS(integrated_obj, file = file.path(qc_dir, paste0(sample_prefix, ".integrated_obj.rds")))
-# DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
 
 FeaturePlot(integrated_obj, features = "PC_1")
+
+clusters_ident <- levels(integrated_obj@meta.data$seurat_clusters)
+gene_marks_clusters <- lapply(clusters_ident, function(cl) {
+    FindMarkers(integrated_obj,
+    ident.1 = cl,
+    assay = "SCT",
+    only.pos = TRUE,
+    logfc.threshold = 0.25,
+    min.pct = 0.1)
+})
+names(gene_marks_clusters) <- paste0("cluster_", clusters_ident)
+sapply(gene_marks_clusters, nrow)
+
+gene_marks_clusters_sig <- lapply(gene_marks_clusters, function(x) {if (!is.null(x)) x[x$p_val <= 0.05, ] else NULL})
+sapply(gene_marks_clusters_sig, nrow)
+gene_marks_clusters_sig   <- Filter(function(x) !is.null(x) && nrow(x) > 0, gene_marks_clusters_sig)
+
+dt_gene_marks_clusters_sig <- do.call(rbind, lapply(names(gene_marks_clusters_sig), function(cl) {
+    df <- gene_marks_clusters_sig[[cl]]
+    df$cluster <- cl
+    return(as.data.table(df, keep.rownames = "gene"))
+}))
+
+fwrite(dt_gene_marks_clusters_sig, "morf10_tf.integration.cluster_sig_genes.tsv", quote = F, sep = "\t")
+
+tf_marks_clusters <- lapply(clusters_ident, function(cl) {
+  FindMarkers(integrated_obj,
+              ident.1 = cl,
+              assay = "SCT_TF",
+              only.pos = TRUE,
+              logfc.threshold = 0.25,
+              min.pct = 0.01)
+})
+names(tf_marks_clusters) <- paste0("cluster_", clusters_ident)
+sapply(tf_marks_clusters, nrow)
+
+tf_marks_clusters_sig <- lapply(tf_marks_clusters, function(x) {if (!is.null(x)) x[x$p_val <= 0.05, ] else NULL})
+sapply(tf_marks_clusters_sig, nrow)
+tf_marks_clusters_sig   <- Filter(function(x) !is.null(x) && nrow(x) > 0, tf_marks_clusters_sig)
+
+dt_tf_marks_clusters_sig <- do.call(rbind, lapply(names(tf_marks_clusters_sig), function(cl) {
+    df <- tf_marks_clusters_sig[[cl]]
+    df$cluster <- cl
+    return(as.data.table(df, keep.rownames = "tf"))
+}))
+
+fwrite(dt_tf_marks_clusters_sig, "morf10_tf.integration.cluster_sig_tfs.tsv", quote = F, sep = "\t")
+
+tf_expressions <- list()
+for (cl in clusters_ident) {
+    cells_in_cluster <- WhichCells(integrated_obj, idents = cl)
+    tf_data <- GetAssayData(integrated_obj, assay = "SCT_TF", slot = "data")[, cells_in_cluster]
+    
+    pct_expressed <- rowSums(tf_data > 0) / length(cells_in_cluster)
+    expressed_tfs <- names(pct_expressed[pct_expressed > 0.01])
+  
+    mean_vals <- sapply(expressed_tfs, function(tf) { 
+        vals <- tf_data[tf, ]
+        vals <- vals[vals > 0]
+        if (length(vals) == 0) NA else mean(vals)
+    })
+  
+    dt <- data.table(TF         = expressed_tfs,
+                     mean_val   = mean_vals[expressed_tfs],
+                     exp_ratio  = pct_expressed[expressed_tfs],
+                     cluster    = cl,
+                     n_cells    = length(cells_in_cluster))
+    setorder(dt, -exp_ratio)
+    tf_expressions[[cl]] <- dt
+}
+
+for (i in 1:length(clusters_ident)) {
+    dt <- tf_expressions[[i]]
+    top_tfs <- dt[order(-exp_ratio)][1:min(10, .N)]
+    
+    plot_file <- paste0("morf10_tf.integration_cl", unique(dt$cluster), ".tf_profile.png")
+
+    p <- ggplot(dt, aes(x = mean_val, y = exp_ratio)) +
+                geom_point(shape = 16, color = "lightgrey") +
+                geom_point(data = top_tfs, color = "red", size = 3) +
+                geom_segment(data = top_tfs, aes(x = mean_val, y = exp_ratio, xend = mean_val, yend = exp_ratio), alpha = 0) +
+                geom_text_repel(data = top_tfs, aes(label = TF), size = 3.5, point.padding = 0.2, box.padding = 0.5, 
+                                segment.size = 0.4, segment.color = "black", min.segment.length = 0,
+                                arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
+                theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+                theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+                theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+                theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+                labs(x = "Mean Normalised UMI", y = "Ratio of Expressed Cells", 
+                    title = paste0("Cluster ", unique(dt$cluster), " (n=", unique(dt$n_cells), ")"))
+
+    png(plot_file, width = 1000, height = 1000, units = "px", res = 200)
+    print(p)
+    dev.off()
+}
+
+
+
+
+
 
 gene_marks_cluster17 <- FindMarkers(integrated_obj,
                                     ident.1 = 17,
@@ -290,23 +390,6 @@ gene_marks_cluster17_sig <- gene_marks_cluster17 %>%
                             rownames_to_column(var = "gene") %>%
                             dplyr::filter(p_val_adj < 0.05 & avg_log2FC > 0.25)
 
-cds <- as.cell_data_set(integrated_obj)
-reducedDim(cds, "UMAP") <- integrated_obj@reductions$umap@cell.embeddings
-cds@clusters$UMAP$clusters <- as.factor(integrated_obj$seurat_clusters)
-names(cds@clusters$UMAP$clusters) <- colnames(cds)
-cds@clusters$UMAP$partitions <- rep(1, ncol(cds))
-names(cds@clusters$UMAP$partitions) <- colnames(cds)
-cds <- learn_graph(cds)
-
-root_cells <- colnames(cds)[cds@clusters$UMAP$clusters == "17"]
-cds <- order_cells(cds, root_cells = root_cells)
-plot_cells(cds, color_cells_by = "pseudotime", show_trajectory_graph = F)
-
-gene_marks_cluster17_sig <- gene_marks_cluster17 %>%
-                            rownames_to_column(var = "gene") %>%
-                            dplyr::filter(p_val_adj < 0.05 & avg_log2FC > 0.25)
-
-
 genes_entrez <- bitr(gene_marks_cluster17_sig$gene, fromType = "SYMBOL",
                      toType = "ENTREZID",
                      OrgDb = org.Hs.eg.db)
@@ -323,3 +406,53 @@ dotplot(ego, showCategory = 20)
 emapplot(ego)
 
 go_results <- as.data.frame(ego)
+
+
+
+
+
+
+
+
+
+DefaultAssay(integrated_obj) <- "SCT"
+cds <- as.cell_data_set(integrated_obj)
+reducedDim(cds, "UMAP") <- integrated_obj@reductions$umap@cell.embeddings
+cds@clusters$UMAP$clusters <- as.factor(integrated_obj$seurat_clusters)
+names(cds@clusters$UMAP$clusters) <- colnames(cds)
+cds@clusters$UMAP$partitions <- rep(1, ncol(cds))
+names(cds@clusters$UMAP$partitions) <- colnames(cds)
+cds <- learn_graph(cds)
+
+root_cells <- colnames(cds)[cds@clusters$UMAP$clusters == "17"]
+cds <- order_cells(cds, root_cells = root_cells)
+plot_cells(cds, color_cells_by = "pseudotime", show_trajectory_graph = F)
+
+save.image("morf10_tf.integration.RData")
+
+
+
+
+# integrated_obj <- AddMetaData(integrated_obj, metadata = pseudotime(cds)[colnames(integrated_obj)], col.name = "pseudotime")
+
+DefaultAssay(integrated_obj) <- "integrated"
+hvg_genes <- VariableFeatures(integrated_obj)
+
+cds <- detect_genes(cds)
+expressed_genes <- row.names(subset(fData(cds), num_cells_expressed >= 100))
+
+genes_to_test <- intersect(expressed_genes, hvg_genes)
+cds_sub <- cds[genes_to_test, ]
+
+cds_fit <- fit_models(cds_sub, model_formula_str = "~pseudotime", cores = 1, clean_model = TRUE)
+fit_coefs <- coefficient_table(cds_fit)
+pseudo_res <- subset(fit_coefs, term == "pseudotime")
+pseudo_res$direction <- ifelse(pseudo_res$estimate > 0, "up", "down")
+pseudo_res$score <- pseudo_res$estimate * -log10(pseudo_res$p_value)
+top_up <- head(pseudo_res[pseudo_res$direction == "up", ][order(-pseudo_res$score), ], 1000)
+top_down <- head(pseudo_res[pseudo_res$direction == "down", ][order(-pseudo_res$score), ], 1000)
+
+
+
+
+
