@@ -446,10 +446,11 @@ fit_coefs <- coefficient_table(cds_fit)
 pseudo_res <- subset(fit_coefs, term == "pseudotime")
 pseudo_res$direction <- ifelse(pseudo_res$estimate > 0, "up", "down")
 pseudo_res$score <- pseudo_res$estimate * -log10(pseudo_res$p_value)
-top_up <- head(pseudo_res[pseudo_res$direction == "up", ][order(-pseudo_res$score), ], 1000)
-top_down <- head(pseudo_res[pseudo_res$direction == "down", ][order(-pseudo_res$score), ], 1000)
-
-
-
+top_up <- pseudo_res[pseudo_res$direction == "up", ]
+top_up <- top_up[order(-top_up$score), ]
+top_up <- head(top_up, 1000)
+top_down <- pseudo_res[pseudo_res$direction == "down", ]
+top_down <- top_down[order(-top_down$score), ]
+top_down <- head(top_down, 1000)
 
 
