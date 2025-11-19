@@ -325,65 +325,34 @@ for (i in 1:length(clusters_ident)) {
 }
 
 # 5. marker genes and TFs for each cluster
-gene_marks_clusters <- lapply(clusters_ident, function(cl) {
-    FindMarkers(integrated_obj,
-    ident.1 = cl,
-    assay = "SCT",
-    only.pos = TRUE,
-    logfc.threshold = 0.25,
-    min.pct = 0.1)
-})
-names(gene_marks_clusters) <- paste0("cluster_", clusters_ident)
-sapply(gene_marks_clusters, nrow)
-gene_marks_clusters <- lapply(gene_marks_clusters, function(df) {if (!is.null(df)) as.data.table(df, keep.rownames = "gene") else NULL})
-
-gene_marks_clusters_sig <- lapply(gene_marks_clusters, function(x) {if (!is.null(x)) x[p_val <= 0.05] else NULL})
-sapply(gene_marks_clusters_sig, nrow)
-
-dt_gene_marks_clusters_sig <- do.call(rbind, lapply(names(gene_marks_clusters_sig), function(cl) {
-    dt <- gene_marks_clusters_sig[[cl]]
-    dt$cluster <- cl
-    return(dt)
-}))
-
+dt_gene_marks_clusters <- as.data.table(FindAllMarkers(integrated_obj, assay = "SCT", only.pos = FALSE, logfc.threshold = 0.25, min.pct = 0.1))
+dt_gene_marks_clusters_sig <- dt_gene_marks_clusters[p_val_adj < 0.05]
 fwrite(dt_gene_marks_clusters_sig, "morf10_tf.integration.cluster_sig_genes.tsv", quote = F, sep = "\t")
 
-tf_marks_clusters <- lapply(clusters_ident, function(cl) {
-  FindMarkers(integrated_obj,
-              ident.1 = cl,
-              assay = "SCT_TF",
-              only.pos = TRUE,
-              logfc.threshold = 0.25,
-              min.pct = 0.01)
-})
-names(tf_marks_clusters) <- paste0("cluster_", clusters_ident)
-sapply(tf_marks_clusters, nrow)
-tf_marks_clusters <- lapply(tf_marks_clusters, function(df) {if (!is.null(df)) as.data.table(df, keep.rownames = "tf") else NULL})
-
-tf_marks_clusters_sig <- lapply(tf_marks_clusters, function(x) {if (!is.null(x)) x[p_val <= 0.05] else NULL})
-sapply(tf_marks_clusters_sig, nrow)
-
-dt_tf_marks_clusters_sig <- do.call(rbind, lapply(names(tf_marks_clusters_sig), function(cl) {
-    dt <- tf_marks_clusters_sig[[cl]]
-    dt$cluster <- cl
-    return(dt)
-}))
-
+dt_tf_marks_clusters <- as.data.table(FindAllMarkers(integrated_obj, assay = "SCT_TF", only.pos = FALSE, logfc.threshold = 0.25, min.pct = 0.005))
+setnames(dt_tf_marks_clusters, "gene", "tf")
+dt_tf_marks_clusters_sig <- dt_tf_marks_clusters[p_val < 0.05]
 fwrite(dt_tf_marks_clusters_sig, "morf10_tf.integration.cluster_sig_tfs.tsv", quote = F, sep = "\t")
 
-for (i in 1:length(clusters_ident)) {
-    dt <- tf_expressions[[i]]
-    top_tfs <- dt[tf %in% tf_marks_clusters_sig[[i]]$tf]
+for (cl in clusters_ident) {
+    dt <- tf_expressions[[cl]]
+    up_tfs <- dt[tf %in% dt_tf_marks_clusters_sig[cluster == cl & avg_log2FC > 0]$tf]
+    up_tfs[, direction := "up"]
+    down_tfs <- dt[tf %in% dt_tf_marks_clusters_sig[cluster == cl & avg_log2FC < 0]$tf]
+    down_tfs[, direction := "down"]
+    top_tfs <- rbind(up_tfs, down_tfs)
     
     plot_file <- paste0("morf10_tf.integration_cl", unique(dt$cluster), ".tf_profile_sig.png")
 
     p <- ggplot(dt, aes(x = mean_val, y = exp_ratio)) +
                 geom_point(shape = 16, color = "lightgrey") +
-                geom_point(data = top_tfs, color = "red", size = 3) +
+                geom_point(data = top_tfs, aes(color = direction), size = 3, show.legend = FALSE) +
                 geom_segment(data = top_tfs, aes(x = mean_val, y = exp_ratio, xend = mean_val, yend = exp_ratio), alpha = 0) +
-                geom_text_repel(data = top_tfs, aes(label = tf), size = 3.5, point.padding = 0.2, box.padding = 0.5, 
+                geom_text_repel(data = top_tfs, aes(label = tf, color = direction), , show.legend = FALSE,
+                                size = 3.5, point.padding = 0.2, box.padding = 0.5, 
                                 segment.size = 0.4, segment.color = "black", min.segment.length = 0,
                                 arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
+                scale_color_manual(values = c("up" = "red", "down" = "royalblue")) +
                 theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
                 theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
                 theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
