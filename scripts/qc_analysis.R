@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
-package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
+package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "ggrepel", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
 package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
@@ -225,6 +225,7 @@ saveRDS(qc_seurat_objs, file = file.path(qc_dir, paste0(sample_prefix, ".qc_seur
 rm(list_qc_barcodes)
 invisible(gc(verbose = FALSE))
 
+# 3. integration
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Removing batch effects ...")
 features <- SelectIntegrationFeatures(object.list = qc_seurat_objs, nfeatures = 3000)
 qc_seurat_objs <- PrepSCTIntegration(object.list = qc_seurat_objs, anchor.features = features)
@@ -273,53 +274,8 @@ DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label 
 
 FeaturePlot(integrated_obj, features = "PC_1")
 
+# 4. TF analysis
 clusters_ident <- levels(integrated_obj@meta.data$seurat_clusters)
-gene_marks_clusters <- lapply(clusters_ident, function(cl) {
-    FindMarkers(integrated_obj,
-    ident.1 = cl,
-    assay = "SCT",
-    only.pos = TRUE,
-    logfc.threshold = 0.25,
-    min.pct = 0.1)
-})
-names(gene_marks_clusters) <- paste0("cluster_", clusters_ident)
-sapply(gene_marks_clusters, nrow)
-
-gene_marks_clusters_sig <- lapply(gene_marks_clusters, function(x) {if (!is.null(x)) x[x$p_val <= 0.05, ] else NULL})
-sapply(gene_marks_clusters_sig, nrow)
-gene_marks_clusters_sig   <- Filter(function(x) !is.null(x) && nrow(x) > 0, gene_marks_clusters_sig)
-
-dt_gene_marks_clusters_sig <- do.call(rbind, lapply(names(gene_marks_clusters_sig), function(cl) {
-    df <- gene_marks_clusters_sig[[cl]]
-    df$cluster <- cl
-    return(as.data.table(df, keep.rownames = "gene"))
-}))
-
-fwrite(dt_gene_marks_clusters_sig, "morf10_tf.integration.cluster_sig_genes.tsv", quote = F, sep = "\t")
-
-tf_marks_clusters <- lapply(clusters_ident, function(cl) {
-  FindMarkers(integrated_obj,
-              ident.1 = cl,
-              assay = "SCT_TF",
-              only.pos = TRUE,
-              logfc.threshold = 0.25,
-              min.pct = 0.01)
-})
-names(tf_marks_clusters) <- paste0("cluster_", clusters_ident)
-sapply(tf_marks_clusters, nrow)
-
-tf_marks_clusters_sig <- lapply(tf_marks_clusters, function(x) {if (!is.null(x)) x[x$p_val <= 0.05, ] else NULL})
-sapply(tf_marks_clusters_sig, nrow)
-tf_marks_clusters_sig   <- Filter(function(x) !is.null(x) && nrow(x) > 0, tf_marks_clusters_sig)
-
-dt_tf_marks_clusters_sig <- do.call(rbind, lapply(names(tf_marks_clusters_sig), function(cl) {
-    df <- tf_marks_clusters_sig[[cl]]
-    df$cluster <- cl
-    return(as.data.table(df, keep.rownames = "tf"))
-}))
-
-fwrite(dt_tf_marks_clusters_sig, "morf10_tf.integration.cluster_sig_tfs.tsv", quote = F, sep = "\t")
-
 tf_expressions <- list()
 for (cl in clusters_ident) {
     cells_in_cluster <- WhichCells(integrated_obj, idents = cl)
@@ -334,7 +290,7 @@ for (cl in clusters_ident) {
         if (length(vals) == 0) NA else mean(vals)
     })
   
-    dt <- data.table(TF         = expressed_tfs,
+    dt <- data.table(tf         = expressed_tfs,
                      mean_val   = mean_vals[expressed_tfs],
                      exp_ratio  = pct_expressed[expressed_tfs],
                      cluster    = cl,
@@ -353,7 +309,7 @@ for (i in 1:length(clusters_ident)) {
                 geom_point(shape = 16, color = "lightgrey") +
                 geom_point(data = top_tfs, color = "red", size = 3) +
                 geom_segment(data = top_tfs, aes(x = mean_val, y = exp_ratio, xend = mean_val, yend = exp_ratio), alpha = 0) +
-                geom_text_repel(data = top_tfs, aes(label = TF), size = 3.5, point.padding = 0.2, box.padding = 0.5, 
+                geom_text_repel(data = top_tfs, aes(label = tf), size = 3.5, point.padding = 0.2, box.padding = 0.5, 
                                 segment.size = 0.4, segment.color = "black", min.segment.length = 0,
                                 arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
                 theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
@@ -367,6 +323,81 @@ for (i in 1:length(clusters_ident)) {
     print(p)
     dev.off()
 }
+
+# 5. marker genes and TFs for each cluster
+gene_marks_clusters <- lapply(clusters_ident, function(cl) {
+    FindMarkers(integrated_obj,
+    ident.1 = cl,
+    assay = "SCT",
+    only.pos = TRUE,
+    logfc.threshold = 0.25,
+    min.pct = 0.1)
+})
+names(gene_marks_clusters) <- paste0("cluster_", clusters_ident)
+sapply(gene_marks_clusters, nrow)
+gene_marks_clusters <- lapply(gene_marks_clusters, function(df) {if (!is.null(df)) as.data.table(df, keep.rownames = "gene") else NULL})
+
+gene_marks_clusters_sig <- lapply(gene_marks_clusters, function(x) {if (!is.null(x)) x[p_val <= 0.05] else NULL})
+sapply(gene_marks_clusters_sig, nrow)
+
+dt_gene_marks_clusters_sig <- do.call(rbind, lapply(names(gene_marks_clusters_sig), function(cl) {
+    dt <- gene_marks_clusters_sig[[cl]]
+    dt$cluster <- cl
+    return(dt)
+}))
+
+fwrite(dt_gene_marks_clusters_sig, "morf10_tf.integration.cluster_sig_genes.tsv", quote = F, sep = "\t")
+
+tf_marks_clusters <- lapply(clusters_ident, function(cl) {
+  FindMarkers(integrated_obj,
+              ident.1 = cl,
+              assay = "SCT_TF",
+              only.pos = TRUE,
+              logfc.threshold = 0.25,
+              min.pct = 0.01)
+})
+names(tf_marks_clusters) <- paste0("cluster_", clusters_ident)
+sapply(tf_marks_clusters, nrow)
+tf_marks_clusters <- lapply(tf_marks_clusters, function(df) {if (!is.null(df)) as.data.table(df, keep.rownames = "tf") else NULL})
+
+tf_marks_clusters_sig <- lapply(tf_marks_clusters, function(x) {if (!is.null(x)) x[p_val <= 0.05] else NULL})
+sapply(tf_marks_clusters_sig, nrow)
+
+dt_tf_marks_clusters_sig <- do.call(rbind, lapply(names(tf_marks_clusters_sig), function(cl) {
+    dt <- tf_marks_clusters_sig[[cl]]
+    dt$cluster <- cl
+    return(dt)
+}))
+
+fwrite(dt_tf_marks_clusters_sig, "morf10_tf.integration.cluster_sig_tfs.tsv", quote = F, sep = "\t")
+
+for (i in 1:length(clusters_ident)) {
+    dt <- tf_expressions[[i]]
+    top_tfs <- dt[tf %in% tf_marks_clusters_sig[[i]]$tf]
+    
+    plot_file <- paste0("morf10_tf.integration_cl", unique(dt$cluster), ".tf_profile_sig.png")
+
+    p <- ggplot(dt, aes(x = mean_val, y = exp_ratio)) +
+                geom_point(shape = 16, color = "lightgrey") +
+                geom_point(data = top_tfs, color = "red", size = 3) +
+                geom_segment(data = top_tfs, aes(x = mean_val, y = exp_ratio, xend = mean_val, yend = exp_ratio), alpha = 0) +
+                geom_text_repel(data = top_tfs, aes(label = tf), size = 3.5, point.padding = 0.2, box.padding = 0.5, 
+                                segment.size = 0.4, segment.color = "black", min.segment.length = 0,
+                                arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
+                theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+                theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+                theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+                theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+                labs(x = "Mean Normalised UMI", y = "Ratio of Expressed Cells", 
+                    title = paste0("Cluster ", unique(dt$cluster), " (n=", unique(dt$n_cells), ")"))
+
+    png(plot_file, width = 1000, height = 1000, units = "px", res = 200)
+    print(p)
+    dev.off()
+}
+
+
+
 
 
 
@@ -429,9 +460,6 @@ cds <- order_cells(cds, root_cells = root_cells)
 plot_cells(cds, color_cells_by = "pseudotime", show_trajectory_graph = F)
 
 save.image("morf10_tf.integration.RData")
-
-
-
 
 # integrated_obj <- AddMetaData(integrated_obj, metadata = pseudotime(cds)[colnames(integrated_obj)], col.name = "pseudotime")
 
