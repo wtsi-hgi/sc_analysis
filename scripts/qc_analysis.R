@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "ggrepel", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
-package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db")
+package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db", "UpSetR", "pheatmap")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
@@ -277,9 +277,10 @@ FeaturePlot(integrated_obj, features = "PC_1")
 # 4. TF analysis
 clusters_ident <- levels(integrated_obj@meta.data$seurat_clusters)
 tf_expressions <- list()
+tf_cells <- list()
 for (cl in clusters_ident) {
     cells_in_cluster <- WhichCells(integrated_obj, idents = cl)
-    tf_data <- GetAssayData(integrated_obj, assay = "SCT_TF", slot = "data")[, cells_in_cluster]
+    tf_data <- GetAssayData(integrated_obj, assay = "SCT_TF", layer = "data")[, cells_in_cluster]
     
     pct_expressed <- rowSums(tf_data > 0) / length(cells_in_cluster)
     expressed_tfs <- names(pct_expressed[pct_expressed > 0.01])
@@ -297,6 +298,10 @@ for (cl in clusters_ident) {
                      n_cells    = length(cells_in_cluster))
     setorder(dt, -exp_ratio)
     tf_expressions[[cl]] <- dt
+
+    tf_sub <- tf_data[rownames(tf_data) %in% tf_expressions[[cl]]$tf, , drop = FALSE]
+    tf_sub_cells <- apply(tf_sub, 1, function(x) {colnames(tf_sub)[x > 0]})
+    tf_cells[[cl]] <- tf_sub_cells
 }
 
 for (i in 1:length(clusters_ident)) {
@@ -321,6 +326,18 @@ for (i in 1:length(clusters_ident)) {
 
     png(plot_file, width = 1000, height = 1000, units = "px", res = 200)
     print(p)
+    dev.off()
+
+    plot_file <- paste0("morf10_tf.integration_cl", unique(dt$cluster), ".tf_upset100.png")
+    png(plot_file, width = 3600, height = 1800, res = 150)
+    print(upset(fromList(tf_cells[[i]]), 
+                nsets = length(tf_cells[[i]]), 
+                nintersects = 100, 
+                order.by = "freq", 
+                matrix.color = "yellowgreen", 
+                main.bar.color = "royalblue", 
+                sets.bar.color = "yellowgreen",
+                mb.ratio = c(0.4, 0.6)))
     dev.off()
 }
 
@@ -415,6 +432,7 @@ go_results <- as.data.frame(ego)
 
 
 
+# 6. pseudotime analysis, but not useful because cells are from HAP1 not stem cells
 DefaultAssay(integrated_obj) <- "SCT"
 cds <- as.cell_data_set(integrated_obj)
 reducedDim(cds, "UMAP") <- integrated_obj@reductions$umap@cell.embeddings
@@ -453,4 +471,29 @@ top_down <- pseudo_res[pseudo_res$direction == "down", ]
 top_down <- top_down[order(-top_down$score), ]
 top_down <- head(top_down, 1000)
 
+expr <- log1p(expr) 
+pseudo <- pseudotime(cds_sub)
+cell_order <- names(sort(pseudo))
+expr_sub <- expr[c(top_up$gene_id, top_down$gene_id), cell_order, drop = FALSE]
+smooth_gene <- function(x, k = 50) {
+    zoo::rollapply(x, width = k, FUN = mean, fill = NA, align = "center")
+}
+expr_smooth <- t(apply(expr_sub, 1, smooth_gene))
+expr_smooth_scaled <- t(scale(t(expr_smooth))) 
+expr_smooth_scaled <- pmax(pmin(expr_smooth_scaled, 0.25), -0.25) 
+gene_trend <- apply(expr_smooth_scaled, 1, function(x) {
+    fit <- lm(x ~ seq_along(x))
+    coef(fit)[2]  # slope
+})
+gene_order <- names(sort(gene_trend, decreasing = TRUE))
+expr_smooth_scaled <- expr_smooth_scaled[gene_order, ]
 
+palette <- colorRampPalette(c("darkblue", "white", "darkred"))(100)
+pheatmap(expr_smooth_scaled,
+         cluster_rows = FALSE,
+         cluster_cols = FALSE,
+         show_rownames = FALSE,
+         show_colnames = FALSE,
+         border_color = NA,
+         color = palette,
+         breaks = seq(-0.25, 0.25, length.out = 101))
