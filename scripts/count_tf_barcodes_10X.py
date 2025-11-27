@@ -138,7 +138,10 @@ def process_pe_pair(read_pair: tuple) -> list:
         return {}, stats
     
     read1_cb = read1_seq[:16]
-    read1_umi = read1_seq[16:26]
+    if args.has_umi:
+        read1_umi = read1_seq[16:26]
+    else:
+        read1_umi = "no_umi"
 
     if read1_cb not in dict_cell_barcodes:
         stats["n_cell_barcode_not_found"] += 1
@@ -276,6 +279,7 @@ if __name__ == "__main__":
     parser.add_argument("--marker_start",   type = int, default = 25,           help = "start index of key region where the marker sequence expects to be found")
     parser.add_argument("--marker_end",     type = int, default = 50,           help = "end index of key region where the marker sequence expects to be found")
     parser.add_argument("--max_mismatch",   type = int, default = 1,            help = "max mismatches allowed in barcode matches")
+    parser.add_argument("--has_umi",        action = "store_true",              help = "whether R1 reads have umi sequences")
     parser.add_argument("--output_dir",     type = str, default = os.getcwd(),  help = "output directory")
     parser.add_argument("--output_prefix",  type = str, default = '',           help = "output prefix")
     parser.add_argument("--chunk_size",     type = int, default = 100000,       help = "chunk size for processing reads")
