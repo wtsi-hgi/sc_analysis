@@ -163,7 +163,7 @@ def process_pe_pair(read_pair: tuple) -> list:
     dict_out = { "cell_barcode" : found_cb,
                  "read_umi"     : read1_umi,
                  "tf_barcode"   : tf_barcode,
-                 "tf_name"      : dict_tf_barcodes[tf_barcode] }
+                 "tf_name"      : dict_tf_names[dict_tf_barcodes[tf_barcode]] }
     stats["n_valid"] += 1
     return dict_out, stats
 
@@ -306,7 +306,8 @@ if __name__ == "__main__":
     # -- read input files -- #
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Reading files, please wait...", flush = True)
     df_tf_barcodes = pl.read_csv(args.tf_barcode, separator = ",", has_header = True)
-    dict_tf_barcodes = { row["barcode"]: row["tf_name"] for row in df_tf_barcodes.iter_rows(named = True) }
+    dict_tf_names = { row["barcode"]: row["tf_name"] for row in df_tf_barcodes.iter_rows(named = True) }
+    dict_tf_barcodes = build_barcode_lookup(dict_tf_names, max_mismatch = args.max_mismatch)
 
     df_cell_barcodes = pl.read_csv(args.cell_barcode, separator = ",", has_header = False)
     dict_cell_barcodes = { row[0]: True for row in df_cell_barcodes.iter_rows(named = False) }
