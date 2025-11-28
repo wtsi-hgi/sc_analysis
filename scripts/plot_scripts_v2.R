@@ -45,7 +45,7 @@ tf_counts_f[, cluster := NULL]
 
 fwrite(tf_counts_f, "50608.tf_per_cell_kmeans.tsv", row.names = F, sep = "\t")
 
-tf_counts_f_n_tf <- tf_counts_f[, .(n_tf       = uniqueN(tf_name), 
+tf_counts_f_n_tf <- tf_counts_f[, .(n_tf         = uniqueN(tf_name), 
                                     mean_count   = as.numeric(mean(count)), 
                                     median_count = as.numeric(median(count))), by = .(cell_barcode)]
 p <- ggplot(tf_counts_f_n_tf, aes(n_tf, mean_count)) +
@@ -115,3 +115,52 @@ ggplot(tf_counts_f_boxplot, aes(x = tf_bin, y = count_value, fill = count_type))
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
     labs(x = "TF Bin", y = "Count", title = "Count by TF Bin")
 
+tf_counts_f_top10 <- tf_counts_f[, {if (.N > 10) .SD[order(-count)][1:10] else .SD}, by = cell_barcode]
+fwrite(tf_counts_f_top10, "50608.tf_per_cell_kmeans.top10.tsv", row.names = F, sep = "\t")
+
+tf_counts_f_top10_n_tf <- tf_counts_f_top10[, .(n_tf         = uniqueN(tf_name), 
+                                                mean_count   = as.numeric(mean(count)), 
+                                                median_count = as.numeric(median(count))), by = .(cell_barcode)]
+tf_counts_f_top10_boxplot <- melt(tf_counts_f_top10_n_tf, 
+                                  id.vars = c("cell_barcode", "n_tf"), 
+                                  measure.vars = c("mean_count", "median_count"),
+                                  variable.name = "count_type", value.name = "count_value")
+ggplot(tf_counts_f_top10_boxplot, aes(x = factor(n_tf), y = count_value, fill = count_type)) +
+    geom_boxplot(outlier.size = 0.5, position = position_dodge(width = 0.8), outlier.colour = "darkgrey", linewidth = 0.1) +
+    scale_y_log10() +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "TF Bin", y = "Count", title = "Count by TF Bin")
+
+tf_counts_f_top10_cells <- tf_counts_f_top10[, .(n_cells = uniqueN(cell_barcode), 
+                                                 mean_count = as.numeric(mean(count)),
+                                                 median_count = as.numeric(median(count))), by = tf_name]
+bin_values <- c(0, seq(20, 100, 20), seq(200, 600, 100), 800, 1000, 1200, 1500, Inf)
+bin_labels <- c("1~20",     "20~40",     "40~60",     "60~80",    "80~100",
+                "100~200",  "200~300",   "300~400",   "400~500",  "500~600", 
+                "600~800",  "800~1000", "1000~1200", "1200~1500", "1500+")
+tf_counts_f_top10_cells[, cell_bin := cut(n_cells, breaks = bin_values, labels = bin_labels, right = FALSE)]
+tf_counts_f_top10_cells_sum <- tf_counts_f_top10_cells[, .N, by = cell_bin]
+
+tf_counts_f_top10_cells_boxplot <- melt(tf_counts_f_top10_cells, 
+                                        id.vars = c("tf_name", "n_cells", "cell_bin"),
+                                        measure.vars = c("mean_count", "median_count"),
+                                        variable.name = "count_type", value.name = "count_value")
+ggplot(tf_counts_f_top10_cells_boxplot, aes(x = cell_bin, y = count_value, fill = count_type)) +
+    geom_boxplot(outlier.size = 0.5, position = position_dodge(width = 0.8), outlier.colour = "darkgrey", linewidth = 0.1) +
+    scale_y_log10() +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "Cell Number Bin", y = "Mean count Per TF", title = "count by Cell Number Bin")
+
+ggplot(tf_counts_f_top10_cells_sum, aes(x = cell_bin, y = N)) +
+    geom_bar(stat = "identity", fill = "yellowgreen", color = "black", linewidth = 0.1) +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    labs(x = "Cell Number Bin", y = "No. of TFs", title = "No. of TFs by Cell Number Bin")
