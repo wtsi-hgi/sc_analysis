@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "ggrepel", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
-package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db", "UpSetR", "pheatmap")
+package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db", "UpSetR", "pheatmap", "matrixStats")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
@@ -376,15 +376,86 @@ fwrite(dt_tf_marks_clusters_sig, "morf10_tf.integration.cluster_sig_tfs.tsv", qu
 obj_cl4_NHP2_1 <- subset(integrated_obj, subset = `NHP2-1` > 0 & seurat_clusters == 4)
 obj_cl8_NHP2_1 <- subset(integrated_obj, subset = `NHP2-1` > 0 & seurat_clusters == 8)
 
-cl4_NHP2_1_tf_data <- as.data.table(GetAssayData(obj_cl4_NHP2_1, assay = "SCT_TF", slot = "data"), keep.rownames = T)
+get_cl_tf_stat <- function(obj) {
+    tf_data <- GetAssayData(obj, assay = "SCT_TF", slot = "data")
+    tf_data <- tf_data[rowSums(tf_data) > 0, ]
+    tf_mean <- sapply(1:nrow(tf_data), function(i){
+        vals <- tf_data[i, ]
+        vals <- vals[vals > 0]
+        if (length(vals) == 0) NA else mean(vals)
+    })
+    tf_median <- sapply(1:nrow(tf_data), function(i){
+        vals <- tf_data[i, ]
+        vals <- vals[vals > 0]
+        if (length(vals) == 0) NA else median(vals)
+    })
+    tf_expressed <- rowSums(tf_data > 0) / ncol(tf_data)
 
+    dt_tf_stat <- data.table(tf         = rownames(tf_data),
+                             mean_val   = tf_mean,
+                             median_val = tf_median,
+                             exp_ratio  = tf_expressed,
+                             cluster    = unique(obj$seurat_clusters),
+                             n_cells    = ncol(tf_data))
+    return(dt_tf_stat)
+}
 
+cl4_NHP2_1_tf_stat <- get_cl_tf_stat(obj_cl4_NHP2_1)
+top_tfs <- cl4_NHP2_1_tf_stat[mean_val > 4][order(-exp_ratio)][1:min(10, .N)]
+ggplot(cl4_NHP2_1_tf_stat, aes(x = mean_val, y = exp_ratio, col = median_val)) +
+    geom_point(alpha = 0.5) +
+    scale_color_viridis_c(option = "plasma", name = "Median Count") +
+    geom_text_repel(data = top_tfs, aes(label = tf), show.legend = FALSE,
+                    size = 3.5, point.padding = 0.2, box.padding = 0.5, max.overlaps = 20,
+                    segment.size = 0.4, segment.color = "black", min.segment.length = 0,
+                    arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    labs(x = "Mean Count",
+         y = "Expressed Ratio of Cells",
+         title = "cluster 4 with NHP2-1 TF Expression")
 
+cl8_NHP2_1_tf_stat <- get_cl_tf_stat(obj_cl8_NHP2_1)
+top_tfs <- cl8_NHP2_1_tf_stat[mean_val > 4][order(-exp_ratio)][1:min(10, .N)]
+ggplot(cl8_NHP2_1_tf_stat, aes(x = mean_val, y = exp_ratio, col = median_val)) +
+    geom_point(alpha = 0.5) +
+    scale_color_viridis_c(option = "plasma", name = "Median Count") +
+    geom_text_repel(data = top_tfs, aes(label = tf), show.legend = FALSE,
+                    size = 3.5, point.padding = 0.2, box.padding = 0.5, max.overlaps = 20,
+                    segment.size = 0.4, segment.color = "black", min.segment.length = 0,
+                    arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    labs(x = "Mean Count",
+         y = "Expressed Ratio of Cells",
+         title = "cluster 8 with NHP2-1 TF Expression")
 
+cl8_vs_cl4_NHP2_1_tf_stat <- merge(cl4_NHP2_1_tf_stat, cl8_NHP2_1_tf_stat, by = "tf", all = TRUE, suffixes = c("_cl4", "_cl8")) 
+cols <- c("mean_val_cl4", "median_val_cl4", "exp_ratio_cl4", "mean_val_cl8", "median_val_cl8", "exp_ratio_cl8")
+cl8_vs_cl4_NHP2_1_tf_stat[, (cols) := lapply(.SD, function(x) fifelse(is.na(x), 0, x)), .SDcols = cols]
+cl8_vs_cl4_NHP2_1_tf_stat[, shape := ifelse(!is.na(mean_val_cl4) & !is.na(mean_val_cl8), "shared", "unique")]
+cl8_vs_cl4_NHP2_1_tf_stat[, exp_diff := exp_ratio_cl8 - exp_ratio_cl4]
+shape_values <- c(shared = 16, unique = 17) 
 
-
-
-
+top_tfs <- cl8_vs_cl4_NHP2_1_tf_stat[mean_val_cl8 > 4][order(-exp_diff)][1:min(10, .N)]
+ggplot(cl8_vs_cl4_NHP2_1_tf_stat, aes(x = mean_val_cl4, y = mean_val_cl8)) +
+    geom_point(aes(shape = shape, color = exp_diff), size = 2, alpha = 0.5) +
+    scale_shape_manual(values = shape_values) +
+    scale_color_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0) +
+    geom_text_repel(data = top_tfs, aes(label = tf), show.legend = FALSE,
+                    size = 3.5, point.padding = 0.2, box.padding = 0.5, max.overlaps = 20,
+                    segment.size = 0.4, segment.color = "black", min.segment.length = 0,
+                    arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
+    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
+    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
+    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
+    labs(x = "Mean Expression in cl4",
+         y = "Mean Expression in cl8",
+         color = "Δ Exp Ratio",
+         shape = "TF Type",
+         title = "TF Mean Expression Comparison: cl4 vs cl8")
 
 
 
