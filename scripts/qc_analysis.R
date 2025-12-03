@@ -242,13 +242,13 @@ integrated_obj <- integrated_obj[, !dup_cells]
 colnames(integrated_obj) <- new_names[!dup_cells]
 cells_in_obj <- colnames(integrated_obj)
 
-tf_barcodes_umi_top10 <- fread(opt$tf_barcode, sep = "\t", header = T)
-tf_barcodes_umi_top10 <- tf_barcodes_umi_top10[cell_barcode %in% cells_in_obj]
-missing_cells <- setdiff(cells_in_obj, tf_barcodes_umi_top10$cell_barcode)
+tfs_top10 <- fread(opt$tf_barcode, sep = "\t", header = T)
+tfs_top10 <- tfs_top10[cell_barcode %in% cells_in_obj]
+missing_cells <- setdiff(cells_in_obj, tfs_top10$cell_barcode)
 
 integrated_obj <- subset(integrated_obj, cells = setdiff(colnames(integrated_obj), missing_cells))
 
-tf_mat <- dcast(tf_barcodes_umi_top10, tf_name ~ cell_barcode, value.var = "umi_count", fill = 0)
+tf_mat <- dcast(tfs_top10, tf_name ~ cell_barcode, value.var = "count", fill = 0)
 tf_mat <- tf_mat[!is.na(tf_name)]
 tf_mat <- as.data.frame(tf_mat)
 rownames(tf_mat) <- tf_mat$tf_name
@@ -261,28 +261,36 @@ integrated_obj[["TF"]]@counts <- tf_mat
 DefaultAssay(integrated_obj) <- "TF"
 integrated_obj <- SCTransform(integrated_obj, assay = "TF", new.assay.name = "SCT_TF", verbose = FALSE)
 
-DefaultAssay(integrated_obj) <- "integrated"
-integrated_obj <- FindVariableFeatures(integrated_obj, assay = "integrated", selection.method = "vst", nfeatures = 3000)
-integrated_obj <- ScaleData(integrated_obj, assay = "integrated", verbose = FALSE)
-integrated_obj <- RunPCA(integrated_obj, assay = "integrated", npcs = 30, verbose = FALSE)
-integrated_obj <- RunUMAP(integrated_obj, assay = "integrated", dims = 1:30)
-integrated_obj <- FindNeighbors(integrated_obj, assay = "integrated", dims = 1:30)
-integrated_obj <- FindClusters(integrated_obj, algorithm = 1, assay = "integrated", resolution = 0.5)
+# DefaultAssay(integrated_obj) <- "integrated"
+# integrated_obj <- FindVariableFeatures(integrated_obj, assay = "integrated", selection.method = "vst", nfeatures = 3000)
+# integrated_obj <- ScaleData(integrated_obj, assay = "integrated", verbose = FALSE)
+# integrated_obj <- RunPCA(integrated_obj, assay = "integrated", npcs = 30, verbose = FALSE)
+# integrated_obj <- RunUMAP(integrated_obj, assay = "integrated", dims = 1:30)
+# integrated_obj <- FindNeighbors(integrated_obj, assay = "integrated", dims = 1:30)
+# integrated_obj <- FindClusters(integrated_obj, algorithm = 1, assay = "integrated", resolution = 0.5)
+
+# DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+# FeaturePlot(integrated_obj, features = "PC_1")
 
 saveRDS(integrated_obj, file = file.path(qc_dir, paste0(sample_prefix, ".integrated_obj.rds")))
-DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
-
-FeaturePlot(integrated_obj, features = "PC_1")
 
 # 4. TF analysis
+DefaultAssay(integrated_obj) <- "SCT_TF"
+integrated_obj <- FindVariableFeatures(integrated_obj, assay = "SCT_TF", selection.method = "vst", nfeatures = 3000)
+integrated_obj <- ScaleData(integrated_obj, assay = "SCT_TF", verbose = FALSE)
+integrated_obj <- RunPCA(integrated_obj, assay = "SCT_TF", npcs = 20, verbose = FALSE)
+integrated_obj <- RunUMAP(integrated_obj, assay = "SCT_TF", dims = 1:20)
+integrated_obj <- FindNeighbors(integrated_obj, assay = "SCT_TF", dims = 1:20)
+integrated_obj <- FindClusters(integrated_obj, algorithm = 2, assay = "SCT_TF", resolution = 0.6)
+
 clusters_ident <- levels(integrated_obj@meta.data$seurat_clusters)
 tf_expressions <- list()
 tf_cells <- list()
 for (cl in clusters_ident) {
     cells_in_cluster <- WhichCells(integrated_obj, idents = cl)
-    tf_data <- GetAssayData(integrated_obj, assay = "SCT_TF", layer = "data")[, cells_in_cluster]
+    tf_data <- GetAssayData(integrated_obj, assay = "TF", layer = "count")[, cells_in_cluster]
     
-    pct_expressed <- rowSums(tf_data > 0) / length(cells_in_cluster)
+    pct_expressed <- rowSums(tf_data > 1) / length(cells_in_cluster)
     expressed_tfs <- names(pct_expressed[pct_expressed > 0.01])
   
     mean_vals <- sapply(expressed_tfs, function(tf) { 
@@ -290,9 +298,16 @@ for (cl in clusters_ident) {
         vals <- vals[vals > 0]
         if (length(vals) == 0) NA else mean(vals)
     })
+
+    median_vals <- sapply(expressed_tfs, function(tf) { 
+        vals <- tf_data[tf, ]
+        vals <- vals[vals > 0]
+        if (length(vals) == 0) NA else median(vals)
+    })
   
     dt <- data.table(tf         = expressed_tfs,
                      mean_val   = mean_vals[expressed_tfs],
+                     median_val = median_vals[expressed_tfs],
                      exp_ratio  = pct_expressed[expressed_tfs],
                      cluster    = cl,
                      n_cells    = length(cells_in_cluster))
@@ -300,7 +315,8 @@ for (cl in clusters_ident) {
     tf_expressions[[cl]] <- dt
 
     tf_sub <- tf_data[rownames(tf_data) %in% tf_expressions[[cl]]$tf, , drop = FALSE]
-    tf_sub_cells <- apply(tf_sub, 1, function(x) {colnames(tf_sub)[x > 0]})
+    nz <- which(tf_sub > 0, arr.ind = TRUE)
+    tf_sub_cells <- split(colnames(tf_sub)[nz[,2]], rownames(tf_sub)[nz[,1]])
     tf_cells[[cl]] <- tf_sub_cells
 }
 
@@ -321,17 +337,19 @@ for (i in 1:length(clusters_ident)) {
                 theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
                 theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
                 theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-                labs(x = "Mean Normalised UMI", y = "Ratio of Expressed Cells", 
+                labs(x = "Mean Count", y = "Ratio of Expressed Cells", 
                     title = paste0("Cluster ", unique(dt$cluster), " (n=", unique(dt$n_cells), ")"))
 
     png(plot_file, width = 1000, height = 1000, units = "px", res = 200)
     print(p)
     dev.off()
 
+    top_tfs <- dt[order(-exp_ratio)][1:min(20, .N)]
+    top_cells <- tf_cells[[i]][top_tfs$tf]
     plot_file <- paste0("morf10_tf.integration_cl", unique(dt$cluster), ".tf_upset100.png")
-    png(plot_file, width = 3600, height = 1800, res = 150)
-    print(upset(fromList(tf_cells[[i]]), 
-                nsets = length(tf_cells[[i]]), 
+    png(plot_file, width = 2400, height = 1200, res = 150)
+    print(upset(fromList(top_cells), 
+                nsets = length(top_cells), 
                 nintersects = 100, 
                 order.by = "freq", 
                 matrix.color = "yellowgreen", 
@@ -340,6 +358,8 @@ for (i in 1:length(clusters_ident)) {
                 mb.ratio = c(0.4, 0.6)))
     dev.off()
 }
+
+save.image("morf10_tf.integrated_obj.RData")
 
 # 5. marker genes and TFs for each cluster
 dt_gene_marks_clusters <- as.data.table(FindAllMarkers(integrated_obj, assay = "SCT", only.pos = FALSE, logfc.threshold = 0.25, min.pct = 0.1))
@@ -350,6 +370,24 @@ dt_tf_marks_clusters <- as.data.table(FindAllMarkers(integrated_obj, assay = "SC
 setnames(dt_tf_marks_clusters, "gene", "tf")
 dt_tf_marks_clusters_sig <- dt_tf_marks_clusters[p_val < 0.05]
 fwrite(dt_tf_marks_clusters_sig, "morf10_tf.integration.cluster_sig_tfs.tsv", quote = F, sep = "\t")
+
+
+
+obj_cl4_NHP2_1 <- subset(integrated_obj, subset = `NHP2-1` > 0 & seurat_clusters == 4)
+obj_cl8_NHP2_1 <- subset(integrated_obj, subset = `NHP2-1` > 0 & seurat_clusters == 8)
+
+cl4_NHP2_1_tf_data <- as.data.table(GetAssayData(obj_cl4_NHP2_1, assay = "SCT_TF", slot = "data"), keep.rownames = T)
+
+
+
+
+
+
+
+
+
+
+
 
 for (cl in clusters_ident) {
     dt <- tf_expressions[[cl]]
