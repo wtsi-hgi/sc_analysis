@@ -362,6 +362,53 @@ for (i in 1:length(clusters_ident)) {
 save.image("morf10_tf.integrated_obj.RData")
 
 # 5. marker genes and TFs for each cluster
+p <- FeaturePlot(integrated_obj, features = "PC_1")
+p + scale_color_gradientn(colors = c("blue", "grey", "red"), limits = c(-25, 25), oob = scales::squish)
+p <- FeaturePlot(integrated_obj, features = "PC_2")
+p + scale_color_gradientn(colors = c("blue", "grey", "red"), limits = c(-25, 25), oob = scales::squish)
+p <- FeaturePlot(integrated_obj, features = "PC_3")
+p + scale_color_gradientn(colors = c("blue", "grey", "red"), limits = c(-25, 25), oob = scales::squish)
+p <- FeaturePlot(integrated_obj, features = "PC_4")
+p + scale_color_gradientn(colors = c("blue", "grey", "red"), limits = c(-25, 25), oob = scales::squish)
+
+umap_score <- as.data.frame(Embeddings(integrated_obj, "umap"))
+tf_data <- as.data.frame(GetAssayData(integrated_obj, assay = "SCT_TF", layer = "data"))
+tf_expressed <- rowSums(tf_data > 1) / ncol(tf_data)
+
+cors_umap1 <- apply(tf_data, 1, function(g) { cor(g, umap_score$umap_1) })
+cors_umap2 <- apply(tf_data, 1, function(g) { cor(g, umap_score$umap_2) })
+
+top_umap1 <- sort(abs(cors_umap1), decreasing = TRUE)[1:20]
+top_umap2 <- sort(abs(cors_umap2), decreasing = TRUE)[1:20]
+
+for (cl in clusters_ident) {
+    sub_obj <- subset(integrated_obj, seurat_clusters == cl)
+    sub_tf_data <- as.data.frame(GetAssayData(sub_obj, assay = "SCT_TF", layer = "data"))
+    sub_tf_data <- sub_tf_data[rowSums(sub_tf_data) > 0, ]
+
+    Heatmap(as.matrix(sub_tf_data),
+            cluster_rows = TRUE,
+            cluster_columns = TRUE,
+            show_column_names = FALSE,
+            show_row_names = FALSE)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 dt_gene_marks_clusters <- as.data.table(FindAllMarkers(integrated_obj, assay = "SCT", only.pos = FALSE, logfc.threshold = 0.25, min.pct = 0.1))
 dt_gene_marks_clusters_sig <- dt_gene_marks_clusters[p_val_adj < 0.05]
 fwrite(dt_gene_marks_clusters_sig, "morf10_tf.integration.cluster_sig_genes.tsv", quote = F, sep = "\t")
@@ -370,6 +417,16 @@ dt_tf_marks_clusters <- as.data.table(FindAllMarkers(integrated_obj, assay = "SC
 setnames(dt_tf_marks_clusters, "gene", "tf")
 dt_tf_marks_clusters_sig <- dt_tf_marks_clusters[p_val < 0.05]
 fwrite(dt_tf_marks_clusters_sig, "morf10_tf.integration.cluster_sig_tfs.tsv", quote = F, sep = "\t")
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -456,6 +513,14 @@ ggplot(cl8_vs_cl4_NHP2_1_tf_stat, aes(x = mean_val_cl4, y = mean_val_cl8)) +
          color = "Δ Exp Ratio",
          shape = "TF Type",
          title = "TF Mean Expression Comparison: cl4 vs cl8")
+
+
+
+
+
+
+
+
 
 
 
