@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "ggrepel", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
-package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db", "UpSetR", "pheatmap", "matrixStats")
+package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db", "UpSetR", "ComplexHeatmap", "matrixStats", "circlize")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
@@ -381,16 +381,128 @@ cors_umap2 <- apply(tf_data, 1, function(g) { cor(g, umap_score$umap_2) })
 top_umap1 <- sort(abs(cors_umap1), decreasing = TRUE)[1:20]
 top_umap2 <- sort(abs(cors_umap2), decreasing = TRUE)[1:20]
 
+# values less than 1 are orignally 0 due to normalization
+tf_names <- rownames(tf_data)
+tf_cell_ratio <- matrix(0, nrow = length(tf_names), ncol = length(clusters_ident), dimnames = list(tf_names, clusters_ident))
+tf_mean_exp <- tf_cell_ratio
+tf_median_exp <- tf_cell_ratio
+for (cl in clusters_ident) {
+    cells_in_cluster <- WhichCells(integrated_obj, idents = cl)
+    sub_tf_data <- tf_data[, cells_in_cluster]
+    sub_tf_data[sub_tf_data < 1] <- 0
+    tf_cell_ratio[, cl] <- rowSums(sub_tf_data > 1) / length(cells_in_cluster)
+
+    tf_mean_exp[, cl] <- rowMeans(sub_tf_data)
+    tf_median_exp[, cl] <- rowMedians(as.matrix(sub_tf_data))
+}
+
+col_fun <- colorRamp2(c(0, 0.5, 1), c("blue", "yellow", "red"))
+Heatmap(tf_cell_ratio,
+        col = col_fun,
+        cluster_rows = TRUE,
+        cluster_columns = TRUE,
+        show_column_names = TRUE,
+        show_row_names = FALSE, 
+        use_raster = F,
+        heatmap_legend_param = list(title = "Cell Ratio"),
+        row_dend_width = unit(2, "cm"),
+        column_dend_height = unit(2, "cm"))
+
+col_fun <- colorRamp2(c(0, 2, 4), c("blue", "yellow", "red"))
+Heatmap(tf_mean_exp,
+        col = col_fun,
+        cluster_rows = TRUE,
+        cluster_columns = TRUE,
+        show_column_names = TRUE,
+        show_row_names = FALSE, 
+        use_raster = F,
+        heatmap_legend_param = list(title = "Mean Expression"),
+        row_dend_width = unit(2, "cm"),
+        column_dend_height = unit(2, "cm"))
+
+col_fun <- colorRamp2(c(0, 2, 4), c("blue", "yellow", "red"))
+Heatmap(tf_median_exp,
+        col = col_fun,
+        cluster_rows = TRUE,
+        cluster_columns = TRUE,
+        show_column_names = TRUE,
+        show_row_names = FALSE, 
+        use_raster = F,
+        heatmap_legend_param = list(title = "Median Expression"),
+        row_dend_width = unit(2, "cm"),
+        column_dend_height = unit(2, "cm"))
+
+sub_cells <- unlist(lapply(c(34, 36, 38), function(cl) { WhichCells(integrated_obj, idents = cl) }))
+sub_tf_data <- tf_data[, sub_cells]
+sub_tf_data[sub_tf_data < 1] <- 0
+sub_tf_data <- sub_tf_data[rowSums(sub_tf_data) > 0, ]
+
+sub_clusters <- Idents(integrated_obj)[sub_cells]
+sub_col_ann <- HeatmapAnnotation(Cluster = sub_clusters, col = list(Cluster = c("34" = "tomato", "36" = "royalblue", "38" = "yellowgreen")))
+
+col_fun <- colorRamp2(c(0, 2, 4), c("blue", "yellow", "red"))
+Heatmap(as.matrix(sub_tf_data),
+        col = col_fun,
+        top_annotation = sub_col_ann,
+        cluster_rows = TRUE,
+        cluster_columns = TRUE,
+        column_split = sub_clusters, 
+        show_column_names = FALSE,
+        show_row_names = FALSE,
+        use_raster = F,
+        heatmap_legend_param = list(title = "TF Expression"),
+        row_dend_width = unit(2, "cm"),
+        show_column_dend = FALSE)
+
+sub_cells <- unlist(lapply(c(22, 30, 32), function(cl) { WhichCells(integrated_obj, idents = cl) }))
+sub_tf_data <- tf_data[, sub_cells]
+sub_tf_data[sub_tf_data < 1] <- 0
+sub_tf_data <- sub_tf_data[rowSums(sub_tf_data) > 0, ]
+
+sub_clusters <- Idents(integrated_obj)[sub_cells]
+sub_col_ann <- HeatmapAnnotation(Cluster = sub_clusters, col = list(Cluster = c("22" = "tomato", "30" = "royalblue", "32" = "yellowgreen")))
+
+col_fun <- colorRamp2(c(0, 2, 4), c("blue", "yellow", "red"))
+Heatmap(as.matrix(sub_tf_data),
+        col = col_fun,
+        top_annotation = sub_col_ann,
+        cluster_rows = TRUE,
+        cluster_columns = TRUE,
+        column_split = sub_clusters, 
+        show_column_names = FALSE,
+        show_row_names = FALSE,
+        use_raster = F,
+        heatmap_legend_param = list(title = "TF Expression"),
+        row_dend_width = unit(2, "cm"),
+        show_column_dend = FALSE)
+
+
+
+# not good, taking too long to create heatmap due to large number of cells
 for (cl in clusters_ident) {
     sub_obj <- subset(integrated_obj, seurat_clusters == cl)
     sub_tf_data <- as.data.frame(GetAssayData(sub_obj, assay = "SCT_TF", layer = "data"))
+    
+    # values less than 1 are orignally 0 due to normalization
+    sub_tf_data[sub_tf_data < 1] <- 0
     sub_tf_data <- sub_tf_data[rowSums(sub_tf_data) > 0, ]
 
+    sub_tf_expressed <- rowSums(sub_tf_data > 0) / ncol(sub_tf_data)
+    sub_tf_data <- sub_tf_data[sub_tf_expressed > 0.01, ]
+
+    col_fun <- colorRamp2(c(0, 1, 2), c("ivory", "yellow", "red"))
+
+    plot_file <- paste0("morf10_tf.integration_cl", cl, ".tf_heatmap.png")
+    png(plot_file, width = 1200, height = 1000, units = "px", res = 150)
     Heatmap(as.matrix(sub_tf_data),
+            col = col_fun,
             cluster_rows = TRUE,
             cluster_columns = TRUE,
             show_column_names = FALSE,
-            show_row_names = FALSE)
+            show_row_names = FALSE,
+            show_column_dend = FALSE,
+            show_row_dend = FALSE)
+    dev.off()
 }
 
 
