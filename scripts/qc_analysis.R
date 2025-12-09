@@ -283,6 +283,16 @@ integrated_obj <- RunUMAP(integrated_obj, assay = "SCT_TF", dims = 1:20)
 integrated_obj <- FindNeighbors(integrated_obj, assay = "SCT_TF", dims = 1:20)
 integrated_obj <- FindClusters(integrated_obj, algorithm = 2, assay = "SCT_TF", resolution = 0.6)
 
+# BOTTLENECK Cells
+integrated_obj <- FindVariableFeatures(integrated_obj, assay = "SCT_TF", selection.method = "vst", nfeatures = 500)
+integrated_obj <- ScaleData(integrated_obj, assay = "SCT_TF", verbose = FALSE)
+integrated_obj <- RunPCA(integrated_obj, assay = "SCT_TF", npcs = 20, verbose = FALSE)
+integrated_obj <- RunUMAP(integrated_obj, assay = "SCT_TF", dims = 1:20)
+integrated_obj <- FindNeighbors(integrated_obj, assay = "SCT_TF", dims = 1:20)
+integrated_obj <- FindClusters(integrated_obj, algorithm = 2, assay = "SCT_TF", resolution = 0.3)
+
+DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+
 clusters_ident <- levels(integrated_obj@meta.data$seurat_clusters)
 tf_expressions <- list()
 tf_cells <- list()
