@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
-package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "ggrepel", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86")
+package_1 <- c("tidyverse", "data.table", "future.apply", "ggplot2", "ggrepel", "optparse", "corrplot", "purrr", "GenomicRanges", "EnsDb.Hsapiens.v86", "Matrix", "glmnet")
 package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "org.Hs.eg.db", "UpSetR", "ComplexHeatmap", "matrixStats", "circlize")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
@@ -258,39 +258,44 @@ tf_mat <- as.matrix(tf_mat[, colnames(integrated_obj)])
 tf_assay <- CreateAssayObject(data = tf_mat)
 integrated_obj[["TF"]] <- tf_assay
 integrated_obj[["TF"]]@counts <- tf_mat
+
 DefaultAssay(integrated_obj) <- "TF"
-integrated_obj <- SCTransform(integrated_obj, assay = "TF", new.assay.name = "SCT_TF", verbose = FALSE)
+# integrated_obj <- RunTFIDF(integrated_obj, assay = "TF", scale.factor = 100000)
+# integrated_obj <- FindTopFeatures(integrated_obj, assay = "TF", min.cutoff = "q0")
+# integrated_obj <- RunSVD(integrated_obj, assay = "TF")
+# ElbowPlot(integrated_obj, reduction = "lsi")
+# integrated_obj <- RunUMAP(integrated_obj, assay = "TF", reduction = "lsi", dims = 1:30)
+# integrated_obj <- FindNeighbors(integrated_obj, assay = "TF", reduction = "lsi", dims = 1:30)
+# integrated_obj <- FindClusters(integrated_obj, algorithm = 2, resolution = 0.3)
+# DimPlot(integrated_obj, reduction = "umap", label = TRUE)
 
-# DefaultAssay(integrated_obj) <- "integrated"
-# integrated_obj <- FindVariableFeatures(integrated_obj, assay = "integrated", selection.method = "vst", nfeatures = 3000)
-# integrated_obj <- ScaleData(integrated_obj, assay = "integrated", verbose = FALSE)
-# integrated_obj <- RunPCA(integrated_obj, assay = "integrated", npcs = 30, verbose = FALSE)
-# integrated_obj <- RunUMAP(integrated_obj, assay = "integrated", dims = 1:30)
-# integrated_obj <- FindNeighbors(integrated_obj, assay = "integrated", dims = 1:30)
-# integrated_obj <- FindClusters(integrated_obj, algorithm = 1, assay = "integrated", resolution = 0.5)
+tf_mat <- as(integrated_obj@assays$TF@counts, "dgCMatrix") 
+cell_totals <- colSums(tf_mat)
+tf_mat@x <- tf_mat@x / rep.int(cell_totals, diff(tf_mat@p))
 
-# DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
-# FeaturePlot(integrated_obj, features = "PC_1")
+Ncells <- ncol(tf_mat)
+tf_rowsum <- Matrix::rowSums(tf_mat > 0)
+idf <- log1p(Ncells / tf_rowsum)
+idf_diag <- Diagonal(x = as.numeric(idf))
+tfidf <- idf_diag %*% tf_mat
+
+lsi <- irlba::irlba(A = tfidf, nv = 50, maxit = 1000)
+lsi_cell_embeddings <- as.matrix(lsi$v %*% diag(lsi$d))
+colnames(lsi_cell_embeddings) <- paste0("LSI_", 1:ncol(lsi_cell_embeddings))
+rownames(lsi_cell_embeddings) <- colnames(integrated_obj)
+integrated_obj[["lsi"]] <- CreateDimReducObject(embeddings = lsi_cell_embeddings, key = "LSI_", assay = "TF")
+
+integrated_obj <- FindNeighbors(integrated_obj, reduction = "lsi", dims = 1:30, annoy.metric = "cosine")
+integrated_obj <- FindClusters(integrated_obj, resolution = 0.2, algorithm = 2)
+integrated_obj <- RunUMAP(integrated_obj, reduction = "lsi", dims = 1:30, metric = "cosine", n.neighbors = 30)
+DimPlot(integrated_obj, reduction = "umap", label = TRUE)
+
+
+
 
 saveRDS(integrated_obj, file = file.path(qc_dir, paste0(sample_prefix, ".integrated_obj.rds")))
 
 # 4. TF analysis
-DefaultAssay(integrated_obj) <- "SCT_TF"
-integrated_obj <- FindVariableFeatures(integrated_obj, assay = "SCT_TF", selection.method = "vst", nfeatures = 3000)
-integrated_obj <- ScaleData(integrated_obj, assay = "SCT_TF", verbose = FALSE)
-integrated_obj <- RunPCA(integrated_obj, assay = "SCT_TF", npcs = 20, verbose = FALSE)
-integrated_obj <- RunUMAP(integrated_obj, assay = "SCT_TF", dims = 1:20)
-integrated_obj <- FindNeighbors(integrated_obj, assay = "SCT_TF", dims = 1:20)
-integrated_obj <- FindClusters(integrated_obj, algorithm = 2, assay = "SCT_TF", resolution = 0.6)
-
-# BOTTLENECK Cells
-integrated_obj <- FindVariableFeatures(integrated_obj, assay = "SCT_TF", selection.method = "vst", nfeatures = 500)
-integrated_obj <- ScaleData(integrated_obj, assay = "SCT_TF", verbose = FALSE)
-integrated_obj <- RunPCA(integrated_obj, assay = "SCT_TF", npcs = 20, verbose = FALSE)
-integrated_obj <- RunUMAP(integrated_obj, assay = "SCT_TF", dims = 1:20)
-integrated_obj <- FindNeighbors(integrated_obj, assay = "SCT_TF", dims = 1:20)
-integrated_obj <- FindClusters(integrated_obj, algorithm = 2, assay = "SCT_TF", resolution = 0.3)
-
 DimPlot(integrated_obj, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
 
 clusters_ident <- levels(integrated_obj@meta.data$seurat_clusters)
@@ -488,308 +493,3 @@ Heatmap(as.matrix(sub_tf_data),
 
 
 
-# not good, taking too long to create heatmap due to large number of cells
-for (cl in clusters_ident) {
-    sub_obj <- subset(integrated_obj, seurat_clusters == cl)
-    sub_tf_data <- as.data.frame(GetAssayData(sub_obj, assay = "SCT_TF", layer = "data"))
-    
-    # values less than 1 are orignally 0 due to normalization
-    sub_tf_data[sub_tf_data < 1] <- 0
-    sub_tf_data <- sub_tf_data[rowSums(sub_tf_data) > 0, ]
-
-    sub_tf_expressed <- rowSums(sub_tf_data > 0) / ncol(sub_tf_data)
-    sub_tf_data <- sub_tf_data[sub_tf_expressed > 0.01, ]
-
-    col_fun <- colorRamp2(c(0, 1, 2), c("ivory", "yellow", "red"))
-
-    plot_file <- paste0("morf10_tf.integration_cl", cl, ".tf_heatmap.png")
-    png(plot_file, width = 1200, height = 1000, units = "px", res = 150)
-    Heatmap(as.matrix(sub_tf_data),
-            col = col_fun,
-            cluster_rows = TRUE,
-            cluster_columns = TRUE,
-            show_column_names = FALSE,
-            show_row_names = FALSE,
-            show_column_dend = FALSE,
-            show_row_dend = FALSE)
-    dev.off()
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-dt_gene_marks_clusters <- as.data.table(FindAllMarkers(integrated_obj, assay = "SCT", only.pos = FALSE, logfc.threshold = 0.25, min.pct = 0.1))
-dt_gene_marks_clusters_sig <- dt_gene_marks_clusters[p_val_adj < 0.05]
-fwrite(dt_gene_marks_clusters_sig, "morf10_tf.integration.cluster_sig_genes.tsv", quote = F, sep = "\t")
-
-dt_tf_marks_clusters <- as.data.table(FindAllMarkers(integrated_obj, assay = "SCT_TF", only.pos = FALSE, logfc.threshold = 0.25, min.pct = 0.005))
-setnames(dt_tf_marks_clusters, "gene", "tf")
-dt_tf_marks_clusters_sig <- dt_tf_marks_clusters[p_val < 0.05]
-fwrite(dt_tf_marks_clusters_sig, "morf10_tf.integration.cluster_sig_tfs.tsv", quote = F, sep = "\t")
-
-
-
-
-
-
-
-
-
-
-
-
-
-obj_cl4_NHP2_1 <- subset(integrated_obj, subset = `NHP2-1` > 0 & seurat_clusters == 4)
-obj_cl8_NHP2_1 <- subset(integrated_obj, subset = `NHP2-1` > 0 & seurat_clusters == 8)
-
-get_cl_tf_stat <- function(obj) {
-    tf_data <- GetAssayData(obj, assay = "SCT_TF", slot = "data")
-    tf_data <- tf_data[rowSums(tf_data) > 0, ]
-    tf_mean <- sapply(1:nrow(tf_data), function(i){
-        vals <- tf_data[i, ]
-        vals <- vals[vals > 0]
-        if (length(vals) == 0) NA else mean(vals)
-    })
-    tf_median <- sapply(1:nrow(tf_data), function(i){
-        vals <- tf_data[i, ]
-        vals <- vals[vals > 0]
-        if (length(vals) == 0) NA else median(vals)
-    })
-    tf_expressed <- rowSums(tf_data > 0) / ncol(tf_data)
-
-    dt_tf_stat <- data.table(tf         = rownames(tf_data),
-                             mean_val   = tf_mean,
-                             median_val = tf_median,
-                             exp_ratio  = tf_expressed,
-                             cluster    = unique(obj$seurat_clusters),
-                             n_cells    = ncol(tf_data))
-    return(dt_tf_stat)
-}
-
-cl4_NHP2_1_tf_stat <- get_cl_tf_stat(obj_cl4_NHP2_1)
-top_tfs <- cl4_NHP2_1_tf_stat[mean_val > 4][order(-exp_ratio)][1:min(10, .N)]
-ggplot(cl4_NHP2_1_tf_stat, aes(x = mean_val, y = exp_ratio, col = median_val)) +
-    geom_point(alpha = 0.5) +
-    scale_color_viridis_c(option = "plasma", name = "Median Count") +
-    geom_text_repel(data = top_tfs, aes(label = tf), show.legend = FALSE,
-                    size = 3.5, point.padding = 0.2, box.padding = 0.5, max.overlaps = 20,
-                    segment.size = 0.4, segment.color = "black", min.segment.length = 0,
-                    arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
-    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
-    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
-    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
-    labs(x = "Mean Count",
-         y = "Expressed Ratio of Cells",
-         title = "cluster 4 with NHP2-1 TF Expression")
-
-cl8_NHP2_1_tf_stat <- get_cl_tf_stat(obj_cl8_NHP2_1)
-top_tfs <- cl8_NHP2_1_tf_stat[mean_val > 4][order(-exp_ratio)][1:min(10, .N)]
-ggplot(cl8_NHP2_1_tf_stat, aes(x = mean_val, y = exp_ratio, col = median_val)) +
-    geom_point(alpha = 0.5) +
-    scale_color_viridis_c(option = "plasma", name = "Median Count") +
-    geom_text_repel(data = top_tfs, aes(label = tf), show.legend = FALSE,
-                    size = 3.5, point.padding = 0.2, box.padding = 0.5, max.overlaps = 20,
-                    segment.size = 0.4, segment.color = "black", min.segment.length = 0,
-                    arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
-    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
-    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
-    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
-    labs(x = "Mean Count",
-         y = "Expressed Ratio of Cells",
-         title = "cluster 8 with NHP2-1 TF Expression")
-
-cl8_vs_cl4_NHP2_1_tf_stat <- merge(cl4_NHP2_1_tf_stat, cl8_NHP2_1_tf_stat, by = "tf", all = TRUE, suffixes = c("_cl4", "_cl8")) 
-cols <- c("mean_val_cl4", "median_val_cl4", "exp_ratio_cl4", "mean_val_cl8", "median_val_cl8", "exp_ratio_cl8")
-cl8_vs_cl4_NHP2_1_tf_stat[, (cols) := lapply(.SD, function(x) fifelse(is.na(x), 0, x)), .SDcols = cols]
-cl8_vs_cl4_NHP2_1_tf_stat[, shape := ifelse(!is.na(mean_val_cl4) & !is.na(mean_val_cl8), "shared", "unique")]
-cl8_vs_cl4_NHP2_1_tf_stat[, exp_diff := exp_ratio_cl8 - exp_ratio_cl4]
-shape_values <- c(shared = 16, unique = 17) 
-
-top_tfs <- cl8_vs_cl4_NHP2_1_tf_stat[mean_val_cl8 > 4][order(-exp_diff)][1:min(10, .N)]
-ggplot(cl8_vs_cl4_NHP2_1_tf_stat, aes(x = mean_val_cl4, y = mean_val_cl8)) +
-    geom_point(aes(shape = shape, color = exp_diff), size = 2, alpha = 0.5) +
-    scale_shape_manual(values = shape_values) +
-    scale_color_gradient2(low = "blue", mid = "grey", high = "red", midpoint = 0) +
-    geom_text_repel(data = top_tfs, aes(label = tf), show.legend = FALSE,
-                    size = 3.5, point.padding = 0.2, box.padding = 0.5, max.overlaps = 20,
-                    segment.size = 0.4, segment.color = "black", min.segment.length = 0,
-                    arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
-    theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
-    theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
-    theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
-    labs(x = "Mean Expression in cl4",
-         y = "Mean Expression in cl8",
-         color = "Δ Exp Ratio",
-         shape = "TF Type",
-         title = "TF Mean Expression Comparison: cl4 vs cl8")
-
-
-
-
-
-
-
-
-
-
-
-
-for (cl in clusters_ident) {
-    dt <- tf_expressions[[cl]]
-    up_tfs <- dt[tf %in% dt_tf_marks_clusters_sig[cluster == cl & avg_log2FC > 0]$tf]
-    up_tfs[, direction := "up"]
-    down_tfs <- dt[tf %in% dt_tf_marks_clusters_sig[cluster == cl & avg_log2FC < 0]$tf]
-    down_tfs[, direction := "down"]
-    top_tfs <- rbind(up_tfs, down_tfs)
-    
-    plot_file <- paste0("morf10_tf.integration_cl", unique(dt$cluster), ".tf_profile_sig.png")
-
-    p <- ggplot(dt, aes(x = mean_val, y = exp_ratio)) +
-                geom_point(shape = 16, color = "lightgrey") +
-                geom_point(data = top_tfs, aes(color = direction), size = 3, show.legend = FALSE) +
-                geom_segment(data = top_tfs, aes(x = mean_val, y = exp_ratio, xend = mean_val, yend = exp_ratio), alpha = 0) +
-                geom_text_repel(data = top_tfs, aes(label = tf, color = direction), , show.legend = FALSE,
-                                size = 3.5, point.padding = 0.2, box.padding = 0.5, 
-                                segment.size = 0.4, segment.color = "black", min.segment.length = 0,
-                                arrow = arrow(length = unit(0.2, "cm"), type = "open", ends = "last")) +
-                scale_color_manual(values = c("up" = "red", "down" = "royalblue")) +
-                theme(panel.background = element_rect(fill = "ivory", colour = "white")) +
-                theme(axis.title = element_text(size = 10, face = "bold", family = "Arial")) +
-                theme(plot.title = element_text(size = 10, face = "bold.italic", family = "Arial")) +
-                theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-                labs(x = "Mean Normalised UMI", y = "Ratio of Expressed Cells", 
-                    title = paste0("Cluster ", unique(dt$cluster), " (n=", unique(dt$n_cells), ")"))
-
-    png(plot_file, width = 1000, height = 1000, units = "px", res = 200)
-    print(p)
-    dev.off()
-}
-
-
-
-
-
-
-
-
-
-gene_marks_cluster17 <- FindMarkers(integrated_obj,
-                                    ident.1 = 17,
-                                    assay = "SCT",       
-                                    only.pos = TRUE,        
-                                    logfc.threshold = 0.25,
-                                    min.pct = 0.10)
-tf_marks_cluster17 <- FindMarkers(integrated_obj,
-                                  ident.1 = 17,
-                                  assay = "SCT_TF",       
-                                  only.pos = TRUE,        
-                                  logfc.threshold = 0.25,
-                                  min.pct = 0.01)
-
-gene_marks_cluster17_sig <- gene_marks_cluster17 %>%
-                            rownames_to_column(var = "gene") %>%
-                            dplyr::filter(p_val_adj < 0.05 & avg_log2FC > 0.25)
-
-genes_entrez <- bitr(gene_marks_cluster17_sig$gene, fromType = "SYMBOL",
-                     toType = "ENTREZID",
-                     OrgDb = org.Hs.eg.db)
-ego <- enrichGO(gene          = genes_entrez$ENTREZID,
-                OrgDb         = org.Hs.eg.db,
-                keyType       = "ENTREZID",
-                ont           = "BP",
-                pAdjustMethod = "BH",
-                qvalueCutoff  = 0.05,
-                readable      = TRUE)
-
-barplot(ego, showCategory = 20)
-dotplot(ego, showCategory = 20)
-emapplot(ego)
-
-go_results <- as.data.frame(ego)
-
-
-
-
-
-
-
-
-
-# 6. pseudotime analysis, but not useful because cells are from HAP1 not stem cells
-DefaultAssay(integrated_obj) <- "SCT"
-cds <- as.cell_data_set(integrated_obj)
-reducedDim(cds, "UMAP") <- integrated_obj@reductions$umap@cell.embeddings
-cds@clusters$UMAP$clusters <- as.factor(integrated_obj$seurat_clusters)
-names(cds@clusters$UMAP$clusters) <- colnames(cds)
-cds@clusters$UMAP$partitions <- rep(1, ncol(cds))
-names(cds@clusters$UMAP$partitions) <- colnames(cds)
-cds <- learn_graph(cds)
-
-root_cells <- colnames(cds)[cds@clusters$UMAP$clusters == "17"]
-cds <- order_cells(cds, root_cells = root_cells)
-plot_cells(cds, color_cells_by = "pseudotime", show_trajectory_graph = F)
-
-save.image("morf10_tf.integration.RData")
-
-# integrated_obj <- AddMetaData(integrated_obj, metadata = pseudotime(cds)[colnames(integrated_obj)], col.name = "pseudotime")
-
-DefaultAssay(integrated_obj) <- "integrated"
-hvg_genes <- VariableFeatures(integrated_obj)
-
-cds <- detect_genes(cds)
-expressed_genes <- row.names(subset(fData(cds), num_cells_expressed >= 100))
-
-genes_to_test <- intersect(expressed_genes, hvg_genes)
-cds_sub <- cds[genes_to_test, ]
-
-cds_fit <- fit_models(cds_sub, model_formula_str = "~pseudotime", cores = 1, clean_model = TRUE)
-fit_coefs <- coefficient_table(cds_fit)
-pseudo_res <- subset(fit_coefs, term == "pseudotime")
-pseudo_res$direction <- ifelse(pseudo_res$estimate > 0, "up", "down")
-pseudo_res$score <- pseudo_res$estimate * -log10(pseudo_res$p_value)
-top_up <- pseudo_res[pseudo_res$direction == "up", ]
-top_up <- top_up[order(-top_up$score), ]
-top_up <- head(top_up, 1000)
-top_down <- pseudo_res[pseudo_res$direction == "down", ]
-top_down <- top_down[order(-top_down$score), ]
-top_down <- head(top_down, 1000)
-
-expr <- log1p(expr) 
-pseudo <- pseudotime(cds_sub)
-cell_order <- names(sort(pseudo))
-expr_sub <- expr[c(top_up$gene_id, top_down$gene_id), cell_order, drop = FALSE]
-smooth_gene <- function(x, k = 50) {
-    zoo::rollapply(x, width = k, FUN = mean, fill = NA, align = "center")
-}
-expr_smooth <- t(apply(expr_sub, 1, smooth_gene))
-expr_smooth_scaled <- t(scale(t(expr_smooth))) 
-expr_smooth_scaled <- pmax(pmin(expr_smooth_scaled, 0.25), -0.25) 
-gene_trend <- apply(expr_smooth_scaled, 1, function(x) {
-    fit <- lm(x ~ seq_along(x))
-    coef(fit)[2]  # slope
-})
-gene_order <- names(sort(gene_trend, decreasing = TRUE))
-expr_smooth_scaled <- expr_smooth_scaled[gene_order, ]
-
-palette <- colorRampPalette(c("darkblue", "white", "darkred"))(100)
-pheatmap(expr_smooth_scaled,
-         cluster_rows = FALSE,
-         cluster_cols = FALSE,
-         show_rownames = FALSE,
-         show_colnames = FALSE,
-         border_color = NA,
-         color = palette,
-         breaks = seq(-0.25, 0.25, length.out = 101))
