@@ -1,6 +1,3 @@
-<div id="top"></div>
-[![MIT License][license-shield]][license-url]
-
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
@@ -48,54 +45,36 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
-
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+Example
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- GETTING STARTED -->
 ## Getting Started
+Example
 
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
+<p align="right">(<a href="#top">back to top</a>)</p>
 
+<!-- PREREQUISITES -->
 ### Prerequisites
+Example
 
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
+<p align="right">(<a href="#top">back to top</a>)</p>
+
+<!-- INSTATLLATION -->
 ### Installation
-
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
-   ```sh
-   git clone https://github.com/github_username/repo_name.git
-   ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
+Example
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- USAGE EXAMPLES -->
 ## Usage
-
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
-
-_For more examples, please refer to the [Documentation](https://example.com)_
+Example
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- ROADMAP -->
 ## Roadmap
-
 - [ ] Feature 1
 - [ ] Feature 2
 - [ ] Feature 3
@@ -105,16 +84,12 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 
 <!-- LICENSE -->
 ## License
-
 Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- CONTACT -->
 ## Contact
-
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
-
-Project Link: [https://github.com/github_username/repo_name](https://github.com/github_username/repo_name)
+Example
 
 <p align="right">(<a href="#top">back to top</a>)</p>
