@@ -5,10 +5,10 @@
     <img src="images/logo.png" alt="Logo" width="80" height="80">
   </a>
 
-<h3 align="center">project_title</h3>
+  <h3 align="center">Single Cell Multiome Analysis</h3>
 
   <p align="center">
-    project_description
+    TF-induced expresssion profile
     <br />
   </p>
 </div>
@@ -19,12 +19,7 @@
 <details>
   <summary>Table of Contents</summary>
   <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
+    <li><a href="#about-the-project">About The Project</a></li>
     <li>
       <a href="#getting-started">Getting Started</a>
       <ul>
@@ -45,19 +40,46 @@
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
-Example
+Synthetic Lineage Project -- by Connor Rogerson
 
+To learn sequence to expression rules, we need to figure out how TFs interact with DNA and affect gene expression.
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- GETTING STARTED -->
 ## Getting Started
-Example
+The pipeline is designed for single-cell multiome analysis, including scRNA-seq, scATAC-seq, and transcription factor profiling.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- PREREQUISITES -->
 ### Prerequisites
-Example
+<summary><b>Python Libraries</b></summary>
+
+    pysam = 0.22.1
+    scipy = 1.15.3
+    pandas = 2.2.2
+    numpy = 2.1.2
+    matplotlib = 3.7.3
+    biopython = 1.85
+    polars = 1.25.2
+    python-levenshtein = 0.12.0
+</details>
+
+<details>
+<summary><b>R Packages</b></summary>
+
+package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "UpSetR", "ComplexHeatmap", "matrixStats", "circlize")
+
+    optparse = 1.7.4
+    tidyverse = 2.0.0
+    data.table = 1.15.4
+    ggplot2 = 3.5.2
+    ggrepel = 0.9.5
+    corrplot = 0.92
+    GenomicRanges = 1.54.1
+    Seurat = 5.3.0
+    
+</details>
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
