@@ -1,5 +1,10 @@
 /* ---- single cell data analysis pipeline ---- */
 
+/* -- load modules -- */
+
+/* -- load subworkflows -- */
+include { check_input_files }         from '../subworkflows/check_input_files.nf'
+
 /* -- define functions -- */
 def helpMessage() {
     log.info """
@@ -29,7 +34,7 @@ if (params.sample_sheet) {
     ch_input = Channel.fromPath(file(params.sample_sheet), checkIfExists: true)
                       .splitCsv(header: true, sep: sep)
     
-    def required_cols = ['sample_type', 'sample_id','input_dir','input_files']
+    def required_cols = ['sample_id', 'run_id', 'dir_cellrange_arc', 'r1_tf_barcodes', 'r2_tf_barcodes', 'tf_barcodes']
     def header_line = new File(params.sample_sheet).readLines().head()
     def header = header_line.split(sep)
     def missing = required_cols.findAll { !(it in header) }
@@ -51,5 +56,17 @@ if (!file(params.outdir).isDirectory()) {
 
 /* -- workflow -- */
 workflow sc_analysis {
+    /* -- check inputs -- */
+    check_input_files(ch_input)
+    ch_cr_files = check_input_files.out.ch_cr_files
+    ch_tf_files = check_input_files.out.ch_tf_files
+
+    /* -- step 1: QC TF barcodes -- */
+
+
+    /* -- step 2: QC single cell multiome data -- */
+
+
+    /* -- step 3: integration -- */
 
 }
