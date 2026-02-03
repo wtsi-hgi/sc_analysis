@@ -24,7 +24,6 @@ if(length(commandArgs(trailingOnly = TRUE)) == 0)
 if(is.null(opt$sample_id)) stop("-s, sample ID is required!", call. = FALSE)
 if(is.null(opt$gex_file))  stop("-g, gene expression h5 file is required!", call. = FALSE)
 if(is.null(opt$atac_file)) stop("-a, ATAC tsv file is required!", call. = FALSE)
-if(is.null(opt$prefix))    stop("-p, output prefix is required!", call. = FALSE)
 
 # -- inputs -- #
 annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
@@ -34,7 +33,7 @@ seqlevelsStyle(annotations) <- "UCSC"
 if(!dir.exists(opt$output_dir)) dir.create(opt$output_dir, recursive = TRUE)
 setwd(opt$output_dir)
 
-sample_prefix <- opt$prefix
+sample_prefix <- ifelse(is.null(opt$prefix), opt$sample_id, opt$prefix)
 
 #-- processing --#
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating the seurat object ...")
@@ -66,7 +65,7 @@ qc_rna_obj <- subset(obj, subset = nFeature_RNA > nFeature_low &
 qc_rna_obj$qc_rna_status <- "passed"
 obj$qc_rna_status[colnames(qc_rna_obj)] <- "passed"
 
-plot_file <- paste0(opt$sample_id, ".qc_rna_violin.png")
+plot_file <- paste0(sample_prefix, ".qc_rna_violin.png")
 p <- VlnPlot(obj, 
              features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), 
              group.by = "qc_rna_status", 
@@ -94,7 +93,7 @@ qc_atac_obj <- subset(qc_rna_obj, subset = nCount_ATAC > nCount_ATAC_low &
 qc_atac_obj$qc_atac_status <- "passed"
 qc_rna_obj$qc_atac_status[colnames(qc_atac_obj)] <- "passed"
 
-plot_file <- paste0(opt$sample_id, ".qc_atac_violin.png")
+plot_file <- paste0(sample_prefix, ".qc_atac_violin.png")
 p <- VlnPlot(qc_rna_obj, 
              features = c("nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
              group.by = "qc_atac_status", 
@@ -142,6 +141,6 @@ DefaultAssay(qc_atac_obj) <- "RNA"
 qc_atac_obj <- SCTransform(qc_atac_obj, verbose = FALSE)
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating output files ...")
-saveRDS(qc_atac_obj, file = paste0(opt$sample_id, ".qc_obj.rds"))
-fwrite(dt_summary, file = paste0(opt$sample_id, ".qc_summary.tsv"), sep = "\t")
-fwrite(colnames(qc_atac_obj), file = paste0(opt$sample_id, ".qc_cell_barcodes.tsv"), sep = "\t", col.names = FALSE)
+saveRDS(qc_atac_obj, file = paste0(sample_prefix ".qc_obj.rds"))
+fwrite(dt_summary, file = paste0(sample_prefix, ".qc_summary.tsv"), sep = "\t")
+fwrite(colnames(qc_atac_obj), file = paste0(sample_prefix, ".qc_cell_barcodes.tsv"), sep = "\t", col.names = FALSE)
