@@ -146,7 +146,6 @@ run_sample_qc <- function(h5file, fragment_file, sample_id) {
     return(list(qc_seurat_obj = qc_atac_obj, dt_summary = dt_summary))
 }
 
-
 # -- inputs -- #
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Reading input files ...")
 
