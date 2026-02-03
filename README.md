@@ -53,6 +53,7 @@ The pipeline is designed for single-cell multiome analysis, including scRNA-seq,
 
 <!-- PREREQUISITES -->
 ### Prerequisites
+<details>
 <summary><b>Python Libraries</b></summary>
 
     pysam = 0.22.1
