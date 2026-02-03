@@ -321,13 +321,13 @@ if __name__ == "__main__":
     os.makedirs(args.output_dir, exist_ok = True)
     os.chdir(args.output_dir)
 
-    stat_out = f"{output_prefix}.barcode_stats.tsv"
-    if os.path.exists(stat_out):
-        os.remove(stat_out)
+    tf_stats = f"{output_prefix}.tf_stats.tsv"
+    if os.path.exists(tf_stats):
+        os.remove(tf_stats)
 
-    barcode_out = f"{output_prefix}.barcode_out.tsv"
-    if os.path.exists(barcode_out):
-        os.remove(barcode_out)
+    tf_barcodes = f"{output_prefix}.tf_barcodes.tsv"
+    if os.path.exists(tf_barcodes):
+        os.remove(tf_barcodes)
 
     # -- parallel processing -- #
     total_stats = { 'n_processed_reads':        0,
@@ -350,7 +350,7 @@ if __name__ == "__main__":
 
      # -- clean and format the extracted barcodes from reads -- #
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Generating results, please wait...", flush = True)
-    with open(stat_out, "w") as fh:
+    with open(tf_stats, "w") as fh:
         fh.write(f"Number of processed reads\t{total_stats['n_processed_reads']}\n")
         fh.write(f"Number of failed reads\t{total_stats['n_failed_reads']}\n")
         fh.write(f"Number of reads with cell barcode not found\t{total_stats['n_cell_barcode_not_found']}\n")
@@ -364,9 +364,9 @@ if __name__ == "__main__":
         df_barcode_counts = ( df_barcode.group_by(["cell_barcode", "read_umi", "tf_barcode", "tf_name"])
                                         .agg(pl.sum("count").alias("count"))
                                         .sort(["cell_barcode", "tf_name"]) )
-        df_barcode_counts.write_csv(barcode_out, separator = "\t", null_value = "NA")
+        df_barcode_counts.write_csv(tf_barcodes, separator = "\t", null_value = "NA")
     else:
-        with open(barcode_out, "w") as f:
+        with open(tf_barcodes, "w") as f:
             f.write("no barcode found in the reads, please check your barcode marker or positions!\n")
 
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Done.", flush = True)
