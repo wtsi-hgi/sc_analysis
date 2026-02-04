@@ -1,11 +1,12 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2", "ggrepel")
-package_2 <- c("Seurat", "Signac", "SeuratWrappers", "clusterProfiler", "GenomicRanges", "EnsDb.Hsapiens.v86")
+package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "clusterProfiler", "GenomicRanges", "EnsDb.Hsapiens.v86")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
 option_list <- list(make_option(c("-s", "--sample_id"),  type = "character", help = "sample ID",               default = NULL),
+                    make_option(c("-r", "--raw_file"),   type = "character", help = "raw expression h5 file",  default = NULL),
                     make_option(c("-g", "--gex_file"),   type = "character", help = "gene expression h5 file", default = NULL),
                     make_option(c("-a", "--atac_file"),  type = "character", help = "ATAC tsv file",           default = NULL),
                     make_option(c("-o", "--output_dir"), type = "character", help = "output directory",        default = getwd()),
@@ -22,6 +23,7 @@ if(length(commandArgs(trailingOnly = TRUE)) == 0)
 
 # -- check options -- #
 if(is.null(opt$sample_id)) stop("-s, sample ID is required!", call. = FALSE)
+if(is.null(opt$raw_file))  stop("-r, raw expression h5 file is required!", call. = FALSE)
 if(is.null(opt$gex_file))  stop("-g, gene expression h5 file is required!", call. = FALSE)
 if(is.null(opt$atac_file)) stop("-a, ATAC tsv file is required!", call. = FALSE)
 
@@ -36,10 +38,32 @@ setwd(opt$output_dir)
 sample_prefix <- ifelse(is.null(opt$prefix), opt$sample_id, opt$prefix)
 
 #-- processing --#
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> removing ambient RNAs ...")
+
+data_raw <- Read10X_h5(opt$raw_file)
+data_gex <- Read10X_h5(opt$gex_file)
+
+obj <- CreateSeuratObject(counts = data_gex[["Gene Expression"]], assay = "RNA")
+obj <- NormalizeData(obj)
+obj <- FindVariableFeatures(obj)
+obj <- ScaleData(obj)
+obj <- RunPCA(obj)
+obj <- FindNeighbors(obj)
+obj <- FindClusters(obj, resolution = 0.5)
+
+soup <- SoupChannel(tod = data_raw[["Gene Expression"]], toc = data_gex[["Gene Expression"]])
+soup <- autoEstCont(soup)
+adj_counts <- adjustCounts(soup)
+
+rm(data_raw)
+rm(data_gex)
+rm(obj)
+rm(soup)
+invisible(gc(verbose = FALSE))
+
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating the seurat object ...")
 
-data_gex <- Read10X_h5(opt$gex_file)
-obj <- CreateSeuratObject(counts = data_gex$`Gene Expression`, assay = "RNA")
+obj <- CreateSeuratObject(counts = adj_counts, assay = "RNA")
 obj[["ATAC"]] <- CreateChromatinAssay(counts = data_atac$Peaks, fragments = opt$atac_file, annotation = annotations, sep = c(":", "-"))
 
 rm(data_gex)
