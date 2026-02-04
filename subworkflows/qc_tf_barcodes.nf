@@ -30,8 +30,8 @@ process QC_TF_BARCODES {
     tuple val(sample_id), val(run_id), path(read_1), path(read_2), path(barcode_csv), path(qced_cells)
 
     output:
-    tuple val(sample_id), val(run_id), path("${sample_id}.${run_id}.tf_stats.tsv"), emit: ch_qced_stats
-    tuple val(sample_id), val(run_id), path("${sample_id}.${run_id}.tf_barcodes.tsv"), emit: ch_qced_tf
+    tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.tf_stats.tsv"), emit: ch_qced_stats
+    tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.tf_barcodes.tsv"), emit: ch_qced_tf
 
     script:
     """
@@ -43,6 +43,6 @@ process QC_TF_BARCODES {
                                                    --marker_start   ${params.marker_start} \
                                                    --marker_end     ${params.marker_end} \
                                                    --max_mismatch   ${params.max_mismatch} \
-                                                   --output_prefix  ${sample_id}.${run_id}
+                                                   --output_prefix  ${sample_id}_${run_id}
     """
 }

@@ -32,13 +32,13 @@ process QC_SC_MULTIOME {
     tuple val(sample_id), val(run_id), path(file_gex), path(file_atac)
 
     output:
-    tuple val(sample_id), val(run_id), path("${sample_id}.${run_id}.qc_obj.rds"),  emit: ch_qced_object
-    tuple val(sample_id), val(run_id), path("${sample_id}.${run_id}.qc_summary.tsv"), path("${sample_id}.${run_id}.qc_rna_violin.png"), path("${sample_id}.${run_id}.qc_atac_violin.png"), emit: ch_qced_summary
-    tuple val(sample_id), val(run_id), path("${sample_id}.${run_id}.qc_cell_barcodes.tsv"), emit: ch_qced_cells
+    tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.qc_obj.rds"),  emit: ch_qced_object
+    tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.qc_summary.tsv"), path("${sample_id}_${run_id}.qc_rna_violin.png"), path("${sample_id}_${run_id}.qc_atac_violin.png"), emit: ch_qced_summary
+    tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.qc_cell_barcodes.tsv"), emit: ch_qced_cells
 
     script:
     """
-    ${projectDir}/scripts/qc_sc_per_sample.R -s ${sample_id}.${run_id} \
+    ${projectDir}/scripts/qc_sc_per_sample.R -s ${sample_id}_${run_id} \
                                              -g ${file_gex} \
                                              -a ${file_atac}
     """
