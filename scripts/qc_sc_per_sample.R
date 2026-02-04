@@ -141,6 +141,12 @@ DefaultAssay(qc_atac_obj) <- "RNA"
 qc_atac_obj <- SCTransform(qc_atac_obj, verbose = FALSE)
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating output files ...")
-saveRDS(qc_atac_obj, file = paste0(sample_prefix ".qc_obj.rds"))
 fwrite(dt_summary, file = paste0(sample_prefix, ".qc_summary.tsv"), sep = "\t")
-fwrite(colnames(qc_atac_obj), file = paste0(sample_prefix, ".qc_cell_barcodes.tsv"), sep = "\t", col.names = FALSE)
+
+cell_barcodes <- data.table(barcode = colnames(qc_atac_obj))
+cell_barcodes[, barcode := sub("-1$", "", barcode)]
+fwrite(cell_barcodes, file = paste0(sample_prefix, ".qc_cell_barcodes.tsv"), sep = "\t", col.names = FALSE)
+
+cell_barcodes[, barcode := paste0(barcode, "-", opt$sample_id)]
+qc_atac_obj <- RenameCells(qc_atac_obj, new.names = cell_barcodes$barcode)
+saveRDS(qc_atac_obj, file = paste0(sample_prefix, ".qc_obj.rds"))
