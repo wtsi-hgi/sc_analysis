@@ -29,7 +29,7 @@ process QC_SC_MULTIOME {
     publishDir "${params.outdir}/qc_sc/${sample_id}", mode: "copy", overwrite: true
 
     input:
-    tuple val(sample_id), val(run_id), path(file_gex), path(file_atac)
+    tuple val(sample_id), val(run_id), path(file_raw), path(file_gex), path(file_atac)
 
     output:
     tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.qc_obj.rds"),  emit: ch_qced_object
@@ -39,6 +39,7 @@ process QC_SC_MULTIOME {
     script:
     """
     ${projectDir}/scripts/qc_sc_per_sample.R -s ${sample_id}_${run_id} \
+                                             -r ${file_raw} \
                                              -g ${file_gex} \
                                              -a ${file_atac}
     """

@@ -23,10 +23,11 @@ process CHECK_FILES {
     tuple val(sample_id), val(run_id), val(dir_cellrange_arc), val(r1_tf_barcodes), val(r2_tf_barcodes), val(tf_barcodes)
 
     output:
-    tuple val(sample_id), val(run_id), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), emit: ch_cr_files
+    tuple val(sample_id), val(run_id), path("${sample_id}.cr_raw.h5"), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), emit: ch_cr_files
     tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.csv"), emit: ch_tf_files
 
     script:
+    def file_cr_raw = file("${dir_cellrange_arc}/raw_feature_bc_matrix.h5")
     def file_cr_gex = file("${dir_cellrange_arc}/filtered_feature_bc_matrix.h5")
     def file_cr_atac = file("${dir_cellrange_arc}/atac_fragments.tsv.gz")
     def file_tf_read1 = file("${r1_tf_barcodes}")
@@ -35,6 +36,11 @@ process CHECK_FILES {
 
     def valid_read_ext = [".fq", ".fastq", ".fq.gz", ".fastq.gz"]
     def valid_ref_ext = [".fa", ".fasta"]
+
+    if (!file_cr_raw.exists()) {
+        log.error("Error: ${file_cr_raw} is not found in ${dir_cellrange_arc}.")
+        exit 1
+    }
 
     if (!file_cr_gex.exists()) {
         log.error("Error: ${file_cr_gex} is not found in ${dir_cellrange_arc}.")
@@ -92,6 +98,7 @@ process CHECK_FILES {
     """
     echo "Checking: ${sample_id}"
 
+    ln -s ${file_cr_raw} ${sample_id}.cr_raw.h5
     ln -s ${file_cr_gex} ${sample_id}.cr_gex.h5
     ln -s ${file_cr_atac} ${sample_id}.cr_atac.tsv.gz
     ln -s ${file_tf_read1} ${sample_id}.tf_barcodes.r1.fastq.gz
