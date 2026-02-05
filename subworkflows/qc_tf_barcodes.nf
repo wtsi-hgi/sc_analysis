@@ -7,9 +7,19 @@ workflow qc_tf_barcodes {
     ch_qced_stats = QC_TF_BARCODES.out.ch_qced_stats
     ch_qced_tf = QC_TF_BARCODES.out.ch_qced_tf
 
+    FILTER_TF_BARCODES(ch_qced_tf)
+    ch_filtered_tf = FILTER_TF_BARCODES.out.ch_filtered_tf
+    if (params.do_top_n) {
+        ch_filtered_tf_top = FILTER_TF_BARCODES.out.ch_filtered_tf_top
+    } else {
+        ch_filtered_tf_top = Channel.empty()
+    }
+
     emit:
     ch_qced_stats
     ch_qced_tf
+    ch_filtered_tf
+    ch_filtered_tf_top
 }
 
 process QC_TF_BARCODES {
@@ -44,5 +54,33 @@ process QC_TF_BARCODES {
                                                    --marker_end     ${params.marker_end} \
                                                    --max_mismatch   ${params.max_mismatch} \
                                                    --output_prefix  ${sample_id}_${run_id}
+    """
+}
+
+process FILTER_TF_BARCODES {
+    label 'process_single_dynamic_memory'
+
+    memory {
+        def file_size = read_1.size()
+        def mem = file_size <= 100_000_000 ? 4 :
+                  file_size <= 1_000_000_000 ? 8 :
+                  file_size <= 2_000_000_000 ? 16 :
+                  file_size <= 4_000_000_000 ? 32 : 64
+        "${mem * task.attempt} GB"
+    }
+
+    publishDir "${params.outdir}/qc_tf/${sample_id}", mode: "copy", overwrite: true
+
+    input:
+    tuple val(sample_id), val(run_id), path(tf_barcode)
+
+    output:
+    tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.filtered_tfs.tsv"), emit: ch_filtered_tf
+    tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.filtered_tfs_top.tsv"), emit: ch_filtered_tf_top, optional: true
+
+    script:
+    def options = params.do_top_n ? "--top_n ${params.top_n}" : ""
+    """
+    ${projectDir}/scripts/filter_tf_barcodes.R -s ${sample_id}_${run_id} -t ${tf_barcode} ${options}
     """
 }
