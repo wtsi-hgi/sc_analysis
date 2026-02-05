@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2", "ggrepel")
-package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "clusterProfiler", "GenomicRanges", "EnsDb.Hsapiens.v86")
+package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "DoubletFinder", "clusterProfiler", "GenomicRanges", "EnsDb.Hsapiens.v86")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
@@ -11,7 +11,9 @@ option_list <- list(make_option(c("-s", "--sample_id"),   type = "character",   
                     make_option(c("-a", "--atac_file"),   type = "character",     help = "ATAC tsv file",           default = NULL),
                     make_option(c("-o", "--output_dir"),  type = "character",     help = "output directory",        default = getwd()),
                     make_option(c("-p", "--prefix"),      type = "character",     help = "output prefix",           default = NULL),
-                    make_option(c("-d", "--del_ambient"), action  = "store_true", help = "remove ambient RNAs",     default = FALSE))
+                    make_option("--del_ambient",          action  = "store_true", help = "remove ambient RNAs",     default = FALSE),
+                    make_option("--del_doublet",          action  = "store_true", help = "remove doublets",         default = FALSE),
+                    make_option("--doublet_rate",         type = "float",         help = "the rate of doublets",    default = 0.008))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -174,6 +176,30 @@ qc_atac_obj <- FindTopFeatures(qc_atac_obj, min.cutoff = "q0")
 
 DefaultAssay(qc_atac_obj) <- "RNA"
 qc_atac_obj <- SCTransform(qc_atac_obj, verbose = FALSE)
+
+if(opt$del_doublet)
+{
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> removing doutblets ...")
+
+    qc_atac_obj <- RunPCA(qc_atac_obj, verbose = FALSE)
+    qc_atac_obj <- FindNeighbors(qc_atac_obj, dims = 1:30)
+    qc_atac_obj <- FindClusters(qc_atac_obj, resolution = 0.5)
+
+    n_expected_doublets <- round(opt$doublet_rate * ncol(qc_atac_obj))
+
+    sweep_res <- paramSweep(qc_atac_obj, PCs = 1:30, sct = TRUE)
+    sweep_stats <- summarizeSweep(sweep_res, GT = FALSE)
+    dt_pk <- find.pK(sweep_stats)
+
+    best_pk <- dt_pk$pK[which.max(dt_pk$BCmetric)]
+    best_pk <- as.numeric(as.character(best_pk))
+
+    qc_atac_obj <- doubletFinder(qc_atac_obj, PCs = 1:30, pN = 0.25, pK = best_pk, nExp = n_expected_doublets, reuse.pANN = NULL, sct = TRUE)
+    df_col <- grep("^DF.classifications", colnames(qc_atac_obj@meta.data), value = TRUE)
+    qc_atac_obj$qc_doublet_status <- qc_atac_obj@meta.data[[df_col]]
+
+    qc_atac_obj <- subset(qc_atac_obj, subset = qc_doublet_status == "Singlet")
+}
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating output files ...")
 fwrite(dt_summary, file = paste0(sample_prefix, ".qc_summary.tsv"), sep = "\t")
