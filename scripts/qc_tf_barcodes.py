@@ -350,14 +350,6 @@ if __name__ == "__main__":
 
      # -- clean and format the extracted barcodes from reads -- #
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Generating results, please wait...", flush = True)
-    with open(tf_stats, "w") as fh:
-        fh.write(f"Number of processed reads\t{total_stats['n_processed_reads']}\n")
-        fh.write(f"Number of failed reads\t{total_stats['n_failed_reads']}\n")
-        fh.write(f"Number of reads with cell barcode not found\t{total_stats['n_cell_barcode_not_found']}\n")
-        fh.write(f"Number of reads which the marker was not found\t{total_stats['n_marker_not_found']}\n")
-        fh.write(f"Number of reads with unmatched barcode\t{total_stats['n_tf_barcode_not_matched']}\n")
-        fh.write(f"Number of valid reads\t{total_stats['n_valid']}\n")
-
     list_results_filtered = [df for df in list_results if df.height > 0]
     if list_results_filtered:
         df_barcode = pl.concat(list_results_filtered, how = "vertical")
@@ -368,5 +360,13 @@ if __name__ == "__main__":
     else:
         with open(tf_barcodes, "w") as f:
             f.write("no barcode found in the reads, please check your barcode marker or positions!\n")
+
+    with open(tf_stats, "w") as fh:
+        fh.write(f"Number of processed reads\t{total_stats['n_processed_reads']}\n")
+        fh.write(f"Number of failed reads\t{total_stats['n_failed_reads']}\n")
+        fh.write(f"Number of reads with cell barcode not found\t{total_stats['n_cell_barcode_not_found']}\n")
+        fh.write(f"Number of reads which the marker was not found\t{total_stats['n_marker_not_found']}\n")
+        fh.write(f"Number of reads with unmatched barcode\t{total_stats['n_tf_barcode_not_matched']}\n")
+        fh.write(f"Number of valid reads\t{total_stats['n_valid']}\n")
 
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Done.", flush = True)
