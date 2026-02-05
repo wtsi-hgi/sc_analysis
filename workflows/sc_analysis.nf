@@ -3,7 +3,9 @@
 /* -- load modules -- */
 
 /* -- load subworkflows -- */
-include { check_input_files }         from '../subworkflows/check_input_files.nf'
+include { check_input_files } from '../subworkflows/check_input_files.nf'
+include { qc_sc_multiome }    from '../subworkflows/qc_sc_multiome.nf'
+include { qc_tf_barcodes }    from '../subworkflows/qc_tf_barcodes.nf'
 
 /* -- define functions -- */
 def helpMessage() {
@@ -61,12 +63,17 @@ workflow sc_analysis {
     ch_cr_files = check_input_files.out.ch_cr_files
     ch_tf_files = check_input_files.out.ch_tf_files
 
-    /* -- step 1: QC TF barcodes -- */
+    /* -- step 1: QC single cell multiome data -- */
+    qc_sc_multiome(ch_cr_files)
+    ch_qced_object = qc_sc_multiome.out.ch_qced_object
+    ch_qced_cells = qc_sc_multiome.out.ch_qced_cells
 
-
-    /* -- step 2: QC single cell multiome data -- */
-
+    /* -- step 2: QC TF barcodes -- */
+    ch_input = ch_tf_files.join(ch_qced_cells, by: [0,1])
+    qc_tf_barcodes(ch_input)
+    ch_qced_stats = qc_tf_barcodes.out.ch_qced_stats
+    ch_qced_tf = qc_tf_barcodes.out.ch_qced_tf
 
     /* -- step 3: integration -- */
-
+    ch_input = ch_qced_object.join(ch_qced_tf, by: [0,1])
 }
