@@ -5,12 +5,13 @@ package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "clusterProfiler",
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
-option_list <- list(make_option(c("-s", "--sample_id"),  type = "character", help = "sample ID",               default = NULL),
-                    make_option(c("-r", "--raw_file"),   type = "character", help = "raw expression h5 file",  default = NULL),
-                    make_option(c("-g", "--gex_file"),   type = "character", help = "gene expression h5 file", default = NULL),
-                    make_option(c("-a", "--atac_file"),  type = "character", help = "ATAC tsv file",           default = NULL),
-                    make_option(c("-o", "--output_dir"), type = "character", help = "output directory",        default = getwd()),
-                    make_option(c("-p", "--prefix"),     type = "character", help = "output prefix",           default = NULL))
+option_list <- list(make_option(c("-s", "--sample_id"),   type = "character",     help = "sample ID",               default = NULL),
+                    make_option(c("-r", "--raw_file"),    type = "character",     help = "raw expression h5 file",  default = NULL),
+                    make_option(c("-g", "--gex_file"),    type = "character",     help = "gene expression h5 file", default = NULL),
+                    make_option(c("-a", "--atac_file"),   type = "character",     help = "ATAC tsv file",           default = NULL),
+                    make_option(c("-o", "--output_dir"),  type = "character",     help = "output directory",        default = getwd()),
+                    make_option(c("-p", "--prefix"),      type = "character",     help = "output prefix",           default = NULL),
+                    make_option(c("-d", "--del_ambient"), action  = "store_true", help = "remove ambient RNAs",     default = FALSE))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -38,41 +39,51 @@ setwd(opt$output_dir)
 sample_prefix <- ifelse(is.null(opt$prefix), opt$sample_id, opt$prefix)
 
 #-- processing --#
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> removing ambient RNAs ...")
+if(opt$del_ambient)
+{
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> removing ambient RNAs ...")
 
-data_raw <- Read10X_h5(opt$raw_file)
-data_gex <- Read10X_h5(opt$gex_file)
+    data_raw <- Read10X_h5(opt$raw_file)
+    data_gex <- Read10X_h5(opt$gex_file)
 
-obj <- CreateSeuratObject(counts = data_gex[["Gene Expression"]], assay = "RNA")
-obj <- NormalizeData(obj)
-obj <- FindVariableFeatures(obj)
-obj <- ScaleData(obj)
-obj <- RunPCA(obj)
-obj <- FindNeighbors(obj)
-obj <- FindClusters(obj, resolution = 0.5)
+    obj <- CreateSeuratObject(counts = data_gex[["Gene Expression"]], assay = "RNA")
+    obj <- NormalizeData(obj)
+    obj <- FindVariableFeatures(obj)
+    obj <- ScaleData(obj)
+    obj <- RunPCA(obj)
+    obj <- FindNeighbors(obj)
+    obj <- FindClusters(obj, resolution = 0.5)
 
-soup <- SoupChannel(tod = data_raw[["Gene Expression"]], toc = data_gex[["Gene Expression"]])
-soup <- autoEstCont(soup)
-adj_counts <- adjustCounts(soup)
+    soup <- SoupChannel(tod = data_raw[["Gene Expression"]], toc = data_gex[["Gene Expression"]])
+    soup <- setClusters(soup, setNames(obj$seurat_clusters, colnames(obj)))
+    soup <- autoEstCont(soup, tfidfMin = 0.5, soupQuantile = 0.2)
+    adj_counts <- adjustCounts(soup)
 
-rm(data_raw)
-rm(data_gex)
-rm(obj)
-rm(soup)
-invisible(gc(verbose = FALSE))
+    rm(data_raw)
+    rm(obj)
+    rm(soup)
+    invisible(gc(verbose = FALSE))
+}
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating the seurat object ...")
 
-obj <- CreateSeuratObject(counts = adj_counts, assay = "RNA")
-obj[["ATAC"]] <- CreateChromatinAssay(counts = data_atac$Peaks, fragments = opt$atac_file, annotation = annotations, sep = c(":", "-"))
+if(opt$del_ambient)
+{
+    obj <- CreateSeuratObject(counts = adj_counts, assay = "RNA")
+} else {
+    data_gex <- Read10X_h5(opt$gex_file)
+    obj <- CreateSeuratObject(counts = data_gex[["Gene Expression"]], assay = "RNA")
+}
+obj[["ATAC"]] <- CreateChromatinAssay(counts = data_gex$Peaks, fragments = opt$atac_file, annotation = annotations, sep = c(":", "-"))
 
 rm(data_gex)
+rm(adj_counts)
 invisible(gc(verbose = FALSE))
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> QC RNA ...")
 DefaultAssay(obj) <- "RNA"
 obj$qc_rna_status <- "failed"
-
+obj$qc_atac_status <- "failed"
 obj[["percent.mt"]] <- PercentageFeatureSet(obj, pattern = "^MT-")
 
 nFeature_low  <- 200
@@ -93,7 +104,7 @@ plot_file <- paste0(sample_prefix, ".qc_rna_violin.png")
 p <- VlnPlot(obj, 
              features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), 
              group.by = "qc_rna_status", 
-             cols = c("skyblue","yellowgreen"),
+             cols = c("royalblue","yellowgreen"),
              pt.size = 0, 
              ncol = 3)
 ggsave(plot_file, p, width = 10, height = 8)
@@ -121,12 +132,12 @@ plot_file <- paste0(sample_prefix, ".qc_atac_violin.png")
 p <- VlnPlot(qc_rna_obj, 
              features = c("nCount_ATAC", "TSS.enrichment", "nucleosome_signal"),
              group.by = "qc_atac_status", 
-             cols = c("skyblue","yellowgreen"),
+             cols = c("royalblue","yellowgreen"),
              pt.size = 0, 
              ncol = 3)
 ggsave(plot_file, p, width = 10, height = 8)
 
-dt_summary <- data.table(sample_id                  = c(opt$sample_id, opt$sample_id, opt$sample_id),
+dt_summary <- data.table(sample_id                  = rep(opt$sample_id, 3),
                          qc_type                    = c("raw", "after_qc_rna", "after_qc_atac"),
                          n_reads_rna                = c(sum(obj@meta.data$nCount_RNA), 
                                                         sum(qc_rna_obj@meta.data$nCount_RNA),
