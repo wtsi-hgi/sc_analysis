@@ -19,7 +19,7 @@ workflow qc_tf_barcodes {
     ch_qced_stats
     ch_qced_tf
     ch_filtered_tf
-    ch_filtered_tf_top
+    ch_filtered_tf_top, optional: true
 }
 
 process QC_TF_BARCODES {

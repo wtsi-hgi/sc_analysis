@@ -37,6 +37,7 @@ sample_prefix <- ifelse(is.null(opt$prefix), opt$sample_id, opt$prefix)
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> keeping TF barcodes with counts > 1 ...")
 tf_counts <- tf_counts[, .(count = sum(count)), by = .(cell_barcode, tf_name)]
 tf_counts <- tf_counts[count > 1]
+tf_counts[, cell_barcode := paste0(cell_barcode, "-", opt$sample_id)]
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> clustering TF barcodes by the counts ...")
 tf_counts[, cluster := {
