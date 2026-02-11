@@ -12,7 +12,7 @@ option_list <- list(make_option(c("-s", "--sample_id"),   type = "character",   
                     make_option(c("-o", "--output_dir"),  type = "character",     help = "output directory",        default = getwd()),
                     make_option(c("-p", "--prefix"),      type = "character",     help = "output prefix",           default = NULL),
                     make_option("--del_ambient",          action  = "store_true", help = "remove ambient RNAs",     default = FALSE),
-                    make_option("--del_doublet",          action  = "store_true", help = "remove doublets",         default = FALSE),
+                    make_option("--mark_doublet",         action  = "store_true", help = "remove doublets",         default = FALSE),
                     make_option("--doublet_rate",         type = "float",         help = "the rate of doublets",    default = 0.008))
 
 opt_parser <- OptionParser(option_list = option_list)
@@ -177,7 +177,7 @@ qc_atac_obj <- FindTopFeatures(qc_atac_obj, min.cutoff = "q0")
 DefaultAssay(qc_atac_obj) <- "RNA"
 qc_atac_obj <- SCTransform(qc_atac_obj, verbose = FALSE)
 
-if(opt$del_doublet)
+if(opt$mark_double)
 {
     message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> removing doutblets ...")
 
@@ -197,8 +197,6 @@ if(opt$del_doublet)
     qc_atac_obj <- doubletFinder(qc_atac_obj, PCs = 1:30, pN = 0.25, pK = best_pk, nExp = n_expected_doublets, reuse.pANN = NULL, sct = TRUE)
     df_col <- grep("^DF.classifications", colnames(qc_atac_obj@meta.data), value = TRUE)
     qc_atac_obj$qc_doublet_status <- qc_atac_obj@meta.data[[df_col]]
-
-    qc_atac_obj <- subset(qc_atac_obj, subset = qc_doublet_status == "Singlet")
 }
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating output files ...")
