@@ -9,7 +9,7 @@ workflow qc_tf_barcodes {
 
     FILTER_TF_BARCODES(ch_qced_tf)
     ch_filtered_tf = FILTER_TF_BARCODES.out.ch_filtered_tf
-    if (params.do_top_n) {
+    if (params.top_n != 0) {
         ch_filtered_tf_top = FILTER_TF_BARCODES.out.ch_filtered_tf_top
     } else {
         ch_filtered_tf_top = Channel.empty()
@@ -19,7 +19,7 @@ workflow qc_tf_barcodes {
     ch_qced_stats
     ch_qced_tf
     ch_filtered_tf
-    ch_filtered_tf_top, optional: true
+    ch_filtered_tf_top
 }
 
 process QC_TF_BARCODES {

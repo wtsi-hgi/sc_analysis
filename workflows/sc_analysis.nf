@@ -30,7 +30,6 @@ Usage:
         --marker_end                  end position of marker sequence, default: 50
         --max_mismatch                maximum mismatch allowed for match sequence, default: 1
         --top_n                       keep top N TFs if 0 keep all, default: 10
-
     """
 }
 
@@ -38,7 +37,7 @@ Usage:
 params.help           = null
 
 params.sample_sheet   = null
-params.outdir         = params.outdir.        ?: "$PWD"
+params.outdir         = params.outdir         ?: "$PWD"
 
 params.del_ambient    = params.del_ambient    ?: false
 params.mark_doublet   = params.mark_doublet   ?: false
