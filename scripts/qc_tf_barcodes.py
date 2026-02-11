@@ -6,6 +6,7 @@ import argparse
 import re
 import gc
 import subprocess
+from pathlib import Path
 import numpy as np
 import polars as pl
 from itertools import product
@@ -305,11 +306,13 @@ if __name__ == "__main__":
 
     # -- read input files -- #
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Reading files, please wait...", flush = True)
-    df_tf_barcodes = pl.read_csv(args.tf_barcode, separator = ",", has_header = True)
+    file_sep = "," if Path(args.tf_barcode).suffix == ".csv" else "\t"
+    df_tf_barcodes = pl.read_csv(args.tf_barcode, separator = file_sep, has_header = True)
     dict_tf_names = { row["barcode"]: row["tf_name"] for row in df_tf_barcodes.iter_rows(named = True) }
     dict_tf_barcodes = build_barcode_lookup(dict_tf_names, max_mismatch = args.max_mismatch)
 
-    df_cell_barcodes = pl.read_csv(args.cell_barcode, separator = ",", has_header = False)
+    file_sep = "," if Path(args.cell_barcode).suffix == ".csv" else "\t"
+    df_cell_barcodes = pl.read_csv(args.cell_barcode, separator = file_sep, has_header = False)
     dict_cell_barcodes = { row[0]: True for row in df_cell_barcodes.iter_rows(named = False) }
     dict_cell_barcodes = build_barcode_lookup(dict_cell_barcodes, max_mismatch = args.max_mismatch)
 

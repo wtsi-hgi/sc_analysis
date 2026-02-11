@@ -80,14 +80,22 @@ process CHECK_FILES {
             firstLine = file_tf_barcodes.withReader { it.readLine() }
         }
 
+        def delimiter = null
+        def file_ext = null
         if (firstLine.contains(",")) {
-            def header = firstLine.split(",").collect { it.toLowerCase() }
-            if (header[0] != "barcode" || header[1] != "tf_name") {
-                log.error("Error: ${file_tf_barcodes} file format is incorrect. Expected header: barcode,tf_name")
-                exit 1
-            }
+            delimiter = ","
+            file_ext = "csv"
+        } else if (firstLine.contains("\t")) {
+            delimiter = "\t"
+            file_ext = "tsv"
         } else {
-            log.error("Error: expect ${file_tf_barcodes} is a csv file.")
+            log.error("Error: ${file_tf_barcodes} file format is incorrect. Expected a CSV or TSV file with header.")
+            exit 1
+        }
+
+        def header = firstLine.split(delimiter).collect { it.trim().toLowerCase() }
+        if (header.size() < 2 || header[0] != "barcode" || header[1] != "tf_name") {
+            log.error("Error: ${file_tf_barcodes} file format is incorrect. Expected header: barcode${delimiter}tf_name")
             exit 1
         }
     } else {
@@ -103,6 +111,6 @@ process CHECK_FILES {
     ln -s ${file_cr_atac} ${sample_id}.cr_atac.tsv.gz
     ln -s ${file_tf_read1} ${sample_id}.tf_barcodes.r1.fastq.gz
     ln -s ${file_tf_read2} ${sample_id}.tf_barcodes.r2.fastq.gz
-    ln -s ${file_tf_barcodes} ${sample_id}.tf_barcodes.csv
+    ln -s ${file_tf_barcodes} ${sample_id}.tf_barcodes.${file_ext}
     """
 }
