@@ -24,7 +24,7 @@ process CHECK_FILES {
 
     output:
     tuple val(sample_id), val(run_id), path("${sample_id}.cr_raw.h5"), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), emit: ch_cr_files
-    tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.${file_ext}"), emit: ch_tf_files
+    tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.*"), emit: ch_tf_files
 
     script:
     def file_cr_raw = file("${dir_cellrange_arc}/raw_feature_bc_matrix.h5")
@@ -72,6 +72,8 @@ process CHECK_FILES {
         exit 1
     }
 
+    def delimiter = null
+    def file_ext = null
     if (file_tf_barcodes.exists()) {
         def firstLine
         if (file_tf_barcodes.toString().endsWith(".gz")) {
@@ -80,8 +82,6 @@ process CHECK_FILES {
             firstLine = file_tf_barcodes.withReader { it.readLine() }
         }
 
-        def delimiter = null
-        def file_ext = null
         if (firstLine.contains(",")) {
             delimiter = ","
             file_ext = "csv"

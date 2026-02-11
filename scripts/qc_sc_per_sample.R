@@ -13,7 +13,7 @@ option_list <- list(make_option(c("-s", "--sample_id"),   type = "character",   
                     make_option(c("-p", "--prefix"),      type = "character",     help = "output prefix",           default = NULL),
                     make_option("--del_ambient",          action  = "store_true", help = "remove ambient RNAs",     default = FALSE),
                     make_option("--mark_doublet",         action  = "store_true", help = "remove doublets",         default = FALSE),
-                    make_option("--doublet_rate",         type = "float",         help = "the rate of doublets",    default = 0.008))
+                    make_option("--doublet_rate",         type = "double",        help = "the rate of doublets",    default = 0.008))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
