@@ -3,9 +3,10 @@
 /* -- load modules -- */
 
 /* -- load subworkflows -- */
-include { check_input_files } from '../subworkflows/check_input_files.nf'
-include { qc_sc_multiome }    from '../subworkflows/qc_sc_multiome.nf'
-include { qc_tf_barcodes }    from '../subworkflows/qc_tf_barcodes.nf'
+include { check_input_files }   from '../subworkflows/check_input_files.nf'
+include { qc_sc_multiome }      from '../subworkflows/qc_sc_multiome.nf'
+include { qc_tf_barcodes }      from '../subworkflows/qc_tf_barcodes.nf'
+include { integrate_qced_data } from '../subworkflows/integrate_qced_data.nf'
 
 /* -- define functions -- */
 def helpMessage() {
@@ -16,14 +17,38 @@ Usage:
     Mandatory arguments:
         --sample_sheet                path of the sample sheet
         --outdir                      the directory path of output results, default: the current directory
+
+    Optional arguments:
+    SC data QC:
+        --del_ambient                 whether to remove ambient RNA, default: false
+        --mark_doublet                whether to mark doublets, default: false
+    
+    TF barcode QC:
+        --tf_barcode_len              length of TF barcode, default: 24
+        --marker_seq                  marker sequence for TF barcode, default: "GAAAGGACGA"
+        --marker_start                start position of marker sequence, default: 25
+        --marker_end                  end position of marker sequence, default: 50
+        --max_mismatch                maximum mismatch allowed for match sequence, default: 1
+        --top_n                       keep top N TFs if 0 keep all, default: 10
+
     """
 }
 
 /* -- initialising parameters -- */
-params.help                        = null
+params.help           = null
 
-params.sample_sheet                = null
-params.outdir                      = params.outdir                      ?: "$PWD"
+params.sample_sheet   = null
+params.outdir         = params.outdir.        ?: "$PWD"
+
+params.del_ambient    = params.del_ambient    ?: false
+params.mark_doublet   = params.mark_doublet   ?: false
+
+params.tf_barcode_len = params.tf_barcode_len ?: 24
+params.marker_seq     = params.marker_seq     ?: "GAAAGGACGA"
+params.marker_start   = params.marker_start   ?: 25
+params.marker_end     = params.marker_end     ?: 50
+params.max_mismatch   = params.max_mismatch   ?: 1
+params.top_n          = params.top_n          ?: null
 
 /* -- check parameters -- */
 if (params.help) {
@@ -71,9 +96,10 @@ workflow sc_analysis {
     /* -- step 2: QC TF barcodes -- */
     ch_input = ch_tf_files.join(ch_qced_cells, by: [0,1])
     qc_tf_barcodes(ch_input)
-    ch_qced_stats = qc_tf_barcodes.out.ch_qced_stats
-    ch_qced_tf = qc_tf_barcodes.out.ch_qced_tf
+    ch_qced_tf = params.top_n == 0 ? qc_tf_barcodes.out.ch_filtered_tf : qc_tf_barcodes.out.ch_filtered_tf_top
 
     /* -- step 3: integration -- */
     ch_input = ch_qced_object.join(ch_qced_tf, by: [0,1])
+    integrate_qced_data(ch_input)
+    ch_integrated_qced = integrate_qced_data.out.ch_integrated_qced
 }
