@@ -79,8 +79,9 @@ process FILTER_TF_BARCODES {
     tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.filtered_tfs_top.tsv"), emit: ch_filtered_tf_top, optional: true
 
     script:
-    def options = params.do_top_n ? "--top_n ${params.top_n}" : ""
     """
-    ${projectDir}/scripts/filter_tf_barcodes.R -s ${sample_id}_${run_id} -t ${tf_barcode} ${options}
+    ${projectDir}/scripts/filter_tf_barcodes.R -s ${sample_id}_${run_id} \
+                                               -t ${tf_barcode} \
+                                               --top_n ${params.top_n}
     """
 }
