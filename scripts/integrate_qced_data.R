@@ -5,11 +5,11 @@ package_2 <- c("Seurat", "Signac", "SeuratWrappers", "clusterProfiler", "Genomic
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
-option_list <- list(make_option(c("-s", "--sample_ids"),  type = "character", help = "list of sample IDs",                       default = NULL),
+option_list <- list(make_option(c("-s", "--sample_ids"),  type = "character", help = "list of sample IDs",              default = NULL),
                     make_option(c("-r", "--rds_files"),   type = "character", help = "list of seurat object rds files", default = NULL),
                     make_option(c("-t", "--tf_files"),    type = "character", help = "list of tf barcode count files",  default = NULL),
                     make_option(c("-o", "--output_dir"),  type = "character", help = "output directory",                default = getwd()),
-                    make_option(c("-p", "--prefix"),      type = "character", help = "output prefix",                   default = NULL))
+                    make_option(c("-p", "--prefix"),      type = "character", help = "output prefix",                   default = "integrated_qced"))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -29,7 +29,7 @@ if(is.null(opt$tf_files))   stop("-t, list of tf barcode count file is required!
 if(!dir.exists(opt$output_dir)) dir.create(opt$output_dir, recursive = TRUE)
 setwd(opt$output_dir)
 
-sample_prefix <- ifelse(is.null(opt$prefix), opt$sample_ids, opt$prefix)
+sample_prefix <- opt$prefix
 
 #-- processing --#
 sample_ids <- strsplit(opt$sample_ids, ",")[[1]]
