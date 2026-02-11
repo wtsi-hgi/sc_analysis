@@ -37,10 +37,12 @@ process QC_SC_MULTIOME {
     tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.qc_cell_barcodes.tsv"), emit: ch_qced_cells
 
     script:
+    def op_ambient = params.del_ambient ? "--del_ambient" : ""
+    def op_doublet = params.mark_doublet ? "--mark_doublet" : ""
     """
     ${projectDir}/scripts/qc_sc_per_sample.R -s ${sample_id}_${run_id} \
                                              -r ${file_raw} \
                                              -g ${file_gex} \
-                                             -a ${file_atac}
+                                             -a ${file_atac} ${op_ambient} ${op_doublet}
     """
 }

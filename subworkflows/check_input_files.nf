@@ -24,7 +24,7 @@ process CHECK_FILES {
 
     output:
     tuple val(sample_id), val(run_id), path("${sample_id}.cr_raw.h5"), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), emit: ch_cr_files
-    tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.csv"), emit: ch_tf_files
+    tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.${file_ext}"), emit: ch_tf_files
 
     script:
     def file_cr_raw = file("${dir_cellrange_arc}/raw_feature_bc_matrix.h5")
