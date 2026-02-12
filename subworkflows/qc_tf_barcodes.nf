@@ -61,7 +61,7 @@ process FILTER_TF_BARCODES {
     label 'process_single_dynamic_memory'
 
     memory {
-        def file_size = read_1.size()
+        def file_size = tf_barcode.size()
         def mem = file_size <= 100_000_000 ? 4 :
                   file_size <= 1_000_000_000 ? 8 :
                   file_size <= 2_000_000_000 ? 16 :

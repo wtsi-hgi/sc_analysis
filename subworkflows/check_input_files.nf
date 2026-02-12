@@ -23,8 +23,8 @@ process CHECK_FILES {
     tuple val(sample_id), val(run_id), val(dir_cellrange_arc), val(r1_tf_barcodes), val(r2_tf_barcodes), val(tf_barcodes)
 
     output:
-    tuple val(sample_id), val(run_id), path("${sample_id}.cr_raw.h5"), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), emit: ch_cr_files
-    tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.*"), emit: ch_tf_files
+    tuple val(sample_id), val(run_id), path("${sample_id}.cr_raw.h5"), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), path("${sample_id}.cr_atac.tsv.gz.tbi"), emit: ch_cr_files
+    tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.{tsv,csv}"), emit: ch_tf_files
 
     script:
     def file_cr_raw = file("${dir_cellrange_arc}/raw_feature_bc_matrix.h5")
@@ -109,6 +109,7 @@ process CHECK_FILES {
     ln -s ${file_cr_raw} ${sample_id}.cr_raw.h5
     ln -s ${file_cr_gex} ${sample_id}.cr_gex.h5
     ln -s ${file_cr_atac} ${sample_id}.cr_atac.tsv.gz
+    ln -s ${file_cr_atac}.tbi ${sample_id}.cr_atac.tsv.gz.tbi
     ln -s ${file_tf_read1} ${sample_id}.tf_barcodes.r1.fastq.gz
     ln -s ${file_tf_read2} ${sample_id}.tf_barcodes.r2.fastq.gz
     ln -s ${file_tf_barcodes} ${sample_id}.tf_barcodes.${file_ext}
