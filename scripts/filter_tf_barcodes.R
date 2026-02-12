@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
 package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2")
-package_2 <- c("reshape2", "scales", "ggExtra", "ggrepel")
+package_2 <- c("reshape2", "scales", "ggExtra", "ggrepel", "Ckmeans.1d.dp")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
