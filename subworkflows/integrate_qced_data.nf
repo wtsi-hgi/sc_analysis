@@ -28,7 +28,7 @@ process INTEGRATE_QCED_DATA {
     publishDir "${params.outdir}/qc_integration/${sample_id}", mode: "copy", overwrite: true
 
     input:
-    tuple val(sample_id), path(qced_rds), path(qced_tf)
+    tuple val(sample_id), val(run_id), path(qced_rds), path(qced_tf)
 
     output:
     tuple val(sample_id), path("${sample_id}.integrated_qced.rds"), emit: ch_integrated_qced
