@@ -54,10 +54,12 @@ invisible(gc(verbose = FALSE))
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "integrating TF counts ...")
 tf_counts <- rbindlist(list_tf_counts)
 tf_mat <- dcast(tf_counts, tf_name ~ cell_barcode, value.var = "count", fill = 0)
-tf_mat <- tf_mat[!is.na(tf_name)]
 tf_mat <- as.data.frame(tf_mat)
 rownames(tf_mat) <- tf_mat$tf_name
 tf_mat$tf_name <- NULL
+
+common_cells <- intersect(colnames(tf_mat), colnames(integrated_obj))
+integrated_obj <- subset(integrated_obj, cells = common_cells)
 tf_mat <- as.matrix(tf_mat[, colnames(integrated_obj)])
 
 rm(list_tf_counts)
@@ -65,9 +67,7 @@ rm(tf_counts)
 invisible(gc(verbose = FALSE))
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "creating final object ...")
-tf_assay <- CreateAssayObject(data = tf_mat)
-integrated_obj[["TF"]] <- tf_assay
-integrated_obj[["TF"]]@counts <- tf_mat
+integrated_obj[["TF"]] <- CreateAssayObject(counts = tf_mat)
 
 rm(tf_mat)
 rm(tf_assay)
