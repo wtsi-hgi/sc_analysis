@@ -20,16 +20,16 @@ process CHECK_FILES {
     label 'process_single'
 
     input:
-    tuple val(sample_id), val(run_id), val(dir_cellrange_arc), val(r1_tf_barcodes), val(r2_tf_barcodes), val(tf_barcodes)
+    tuple val(sample_id), val(run_id), val(dir_cellranger_arc), val(r1_tf_barcodes), val(r2_tf_barcodes), val(tf_barcodes)
 
     output:
     tuple val(sample_id), val(run_id), path("${sample_id}.cr_raw.h5"), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), path("${sample_id}.cr_atac.tsv.gz.tbi"), emit: ch_cr_files
     tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.{tsv,csv}"), emit: ch_tf_files
 
     script:
-    def file_cr_raw = file("${dir_cellrange_arc}/raw_feature_bc_matrix.h5")
-    def file_cr_gex = file("${dir_cellrange_arc}/filtered_feature_bc_matrix.h5")
-    def file_cr_atac = file("${dir_cellrange_arc}/atac_fragments.tsv.gz")
+    def file_cr_raw = file("${dir_cellranger_arc}/raw_feature_bc_matrix.h5")
+    def file_cr_gex = file("${dir_cellranger_arc}/filtered_feature_bc_matrix.h5")
+    def file_cr_atac = file("${dir_cellranger_arc}/atac_fragments.tsv.gz")
     def file_tf_read1 = file("${r1_tf_barcodes}")
     def file_tf_read2 = file("${r2_tf_barcodes}")
     def file_tf_barcodes = file("${tf_barcodes}")
@@ -38,17 +38,17 @@ process CHECK_FILES {
     def valid_ref_ext = [".fa", ".fasta"]
 
     if (!file_cr_raw.exists()) {
-        log.error("Error: ${file_cr_raw} is not found in ${dir_cellrange_arc}.")
+        log.error("Error: ${file_cr_raw} is not found in ${dir_cellranger_arc}.")
         exit 1
     }
 
     if (!file_cr_gex.exists()) {
-        log.error("Error: ${file_cr_gex} is not found in ${dir_cellrange_arc}.")
+        log.error("Error: ${file_cr_gex} is not found in ${dir_cellranger_arc}.")
         exit 1
     }
 
     if (!file_cr_atac.exists()) {
-        log.error("Error: ${file_cr_atac} is not found in ${dir_cellrange_arc}.")
+        log.error("Error: ${file_cr_atac} is not found in ${dir_cellranger_arc}.")
         exit 1
     }
 
