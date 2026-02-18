@@ -60,7 +60,7 @@ if (params.sample_sheet) {
     ch_input = Channel.fromPath(file(params.sample_sheet), checkIfExists: true)
                       .splitCsv(header: true, sep: sep)
     
-    def required_cols = ['sample_id', 'run_id', 'dir_cellrange_arc', 'r1_tf_barcodes', 'r2_tf_barcodes', 'tf_barcodes']
+    def required_cols = ['sample_id', 'run_id', 'dir_cellranger_arc', 'r1_tf_barcodes', 'r2_tf_barcodes', 'tf_barcodes']
     def header_line = new File(params.sample_sheet).readLines().head()
     def header = header_line.split(sep)
     def missing = required_cols.findAll { !(it in header) }
