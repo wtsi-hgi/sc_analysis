@@ -1,19 +1,20 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
-package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2", "ggrepel")
-package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "DoubletFinder", "clusterProfiler", "GenomicRanges", "EnsDb.Hsapiens.v86")
+package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2", "ggrepel", "EnsDb.Hsapiens.v86", "clusterProfiler")
+package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "DoubletFinder", "GenomicRanges", "GenomeInfoDb", "AnnotationHub", "scDblFinder")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
-option_list <- list(make_option(c("-s", "--sample_id"),   type = "character",     help = "sample ID",               default = NULL),
-                    make_option(c("-r", "--raw_file"),    type = "character",     help = "raw expression h5 file",  default = NULL),
-                    make_option(c("-g", "--gex_file"),    type = "character",     help = "gene expression h5 file", default = NULL),
-                    make_option(c("-a", "--atac_file"),   type = "character",     help = "ATAC tsv file",           default = NULL),
-                    make_option(c("-o", "--output_dir"),  type = "character",     help = "output directory",        default = getwd()),
-                    make_option(c("-p", "--prefix"),      type = "character",     help = "output prefix",           default = NULL),
-                    make_option("--del_ambient",          action  = "store_true", help = "remove ambient RNAs",     default = FALSE),
-                    make_option("--mark_doublet",         action  = "store_true", help = "remove doublets",         default = FALSE),
-                    make_option("--doublet_rate",         type = "double",        help = "the rate of doublets",    default = 0.008))
+option_list <- list(make_option(c("-s", "--sample_id"),  type = "character",     help = "sample ID",                  default = NULL),
+                    make_option(c("-r", "--raw_file"),   type = "character",     help = "raw expression h5 file",     default = NULL),
+                    make_option(c("-g", "--gex_file"),   type = "character",     help = "gene expression h5 file",    default = NULL),
+                    make_option(c("-a", "--atac_file"),  type = "character",     help = "ATAC tsv file",              default = NULL),
+                    make_option(c("-o", "--output_dir"), type = "character",     help = "output directory",           default = getwd()),
+                    make_option(c("-p", "--prefix"),     type = "character",     help = "output prefix",              default = NULL),
+                    make_option("--del_ambient",         action  = "store_true", help = "remove ambient RNAs",        default = FALSE),
+                    make_option("--mark_doublet",        action  = "store_true", help = "mark doublets",              default = FALSE),
+                    make_option("--doublet_rate",        type = "double",        help = "the rate of doublets",       default = 0.008),
+                    make_option("--doublet_cells",       type = "character",     help = "doublet cell barcodes file", default = NULL))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -179,7 +180,7 @@ qc_atac_obj <- SCTransform(qc_atac_obj, verbose = FALSE)
 
 if(opt$mark_double)
 {
-    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> removing doutblets ...")
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> marking doutblets using scRNA data ...")
 
     qc_atac_obj <- RunPCA(qc_atac_obj, verbose = FALSE)
     qc_atac_obj <- FindNeighbors(qc_atac_obj, dims = 1:30)
@@ -197,6 +198,16 @@ if(opt$mark_double)
     qc_atac_obj <- doubletFinder(qc_atac_obj, PCs = 1:30, pN = 0.25, pK = best_pk, nExp = n_expected_doublets, reuse.pANN = NULL, sct = TRUE)
     df_col <- grep("^DF.classifications", colnames(qc_atac_obj@meta.data), value = TRUE)
     qc_atac_obj$qc_doublet_status <- qc_atac_obj@meta.data[[df_col]]
+
+    qc_atac_obj@meta.data <- qc_atac_obj@meta.data[, !grepl("^DF.classifications|^pANN", colnames(qc_atac_obj@meta.data))]
+
+    if(!is.null(opt$doublet_cells))
+    {
+        message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> marking doutblets using scATAC data ...")
+
+        doublet_cells <- fread(opt$doublet_cells, header = FALSE)[[1]]
+        qc_atac_obj$qc_doublet_status[colnames(qc_atac_obj) %in% doublet_cells] <- "Doublet"
+    }
 }
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating output files ...")
