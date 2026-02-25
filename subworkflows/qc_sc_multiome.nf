@@ -39,7 +39,7 @@ process GET_ATAC_DOUBLETS {
 
     script:
     """
-    zcat ${file_atac} | awk '$1 ~ /^chr([1-9]|1[0-9]|2[0-2])$/' | bgzip > fragments_autosomes.tsv.gz
+    zcat ${file_atac} | grep -E '^chr([1-9]|1[0-9]|2[0-2])\$' | bgzip > fragments_autosomes.tsv.gz
 
     bedtools intersect -a fragments_autosomes.tsv.gz \
                        -b ${projectDir}/data/hg38_repeatmasker_ucsc.tsv.gz \
