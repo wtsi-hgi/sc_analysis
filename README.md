@@ -56,20 +56,14 @@ The pipeline is designed for single-cell multiome analysis, including scRNA-seq,
 <details>
 <summary><b>Python Libraries</b></summary>
 
-    pysam = 0.22.1
-    scipy = 1.15.3
     pandas = 2.2.2
     numpy = 2.1.2
-    matplotlib = 3.7.3
     biopython = 1.85
     polars = 1.25.2
-    python-levenshtein = 0.12.0
 </details>
 
 <details>
 <summary><b>R Packages</b></summary>
-
-package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "SeuratWrappers", "clusterProfiler", "UpSetR", "ComplexHeatmap", "matrixStats", "circlize")
 
     optparse = 1.7.4
     tidyverse = 2.0.0
@@ -79,29 +73,20 @@ package_2 <- c("Seurat", "Signac", "biovizBase", "glmGamPoi", "monocle3", "Seura
     corrplot = 0.92
     GenomicRanges = 1.54.1
     Seurat = 5.3.0
-    
+    Signac = 1.12.0
+    SeuratWrappers = 0.3.4
+    SoupX = 1.6.2
+    DoubletFinder = 2.0.6
+    GenomeInfoDb = 1.38.8
 </details>
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-<!-- INSTATLLATION -->
-### Installation
-Example
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- USAGE EXAMPLES -->
 ## Usage
-Example
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+### Sample Sheet
 
-<!-- ROADMAP -->
-## Roadmap
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
