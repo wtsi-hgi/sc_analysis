@@ -101,3 +101,13 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 Example
 
 <p align="right">(<a href="#top">back to top</a>)</p>
+
+TF plot:
+y -> median no. of TFs
+x -> differnt tf count filters (> 1,2,3 etc..)
+
+report:
+summary/stats -> html report
+
+h5 outputs + matrix tvs files
+

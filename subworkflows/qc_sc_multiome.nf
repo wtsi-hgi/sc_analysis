@@ -24,10 +24,10 @@ process GET_ATAC_DOUBLETS {
 
     memory {
         def file_size = file_atac.size()
-        def mem = file_size <= 100_000_000 ? 20 :
-                  file_size <= 200_000_000 ? 40 :
-                  file_size <= 400_000_000 ? 80 :
-                  file_size <= 800_000_000 ? 160 : 320
+        def mem = file_size <= 1_000_000_000 ? 2 :
+                  file_size <= 2_000_000_000 ? 4 :
+                  file_size <= 4_000_000_000 ? 8 :
+                  file_size <= 8_000_000_000 ? 16 : 32
         "${mem * task.attempt} GB"
     }
 
@@ -58,10 +58,10 @@ process QC_SC_MULTIOME {
 
     memory {
         def file_size = file_gex.size()
-        def mem = file_size <= 100_000_000 ? 20 :
-                  file_size <= 200_000_000 ? 40 :
-                  file_size <= 400_000_000 ? 80 :
-                  file_size <= 800_000_000 ? 160 : 320
+        def mem = file_size <= 100_000_000 ? 15 :
+                  file_size <= 200_000_000 ? 30 :
+                  file_size <= 400_000_000 ? 60 :
+                  file_size <= 800_000_000 ? 120 : 240
         "${mem * task.attempt} GB"
     }
 

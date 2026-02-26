@@ -27,10 +27,10 @@ process QC_TF_BARCODES {
 
     memory {
         def file_size = read_1.size()
-        def mem = file_size <= 10_000_000_000 ? 10 :
-                  file_size <= 20_000_000_000 ? 20 :
-                  file_size <= 40_000_000_000 ? 40 :
-                  file_size <= 80_000_000_000 ? 80 : 160
+        def mem = file_size <= 10_000_000_000 ? 4 :
+                  file_size <= 20_000_000_000 ? 8 :
+                  file_size <= 40_000_000_000 ? 16 :
+                  file_size <= 80_000_000_000 ? 32 : 64
         "${mem * task.attempt} GB"
     }
 
@@ -62,10 +62,10 @@ process FILTER_TF_BARCODES {
 
     memory {
         def file_size = tf_barcode.size()
-        def mem = file_size <= 100_000_000 ? 4 :
-                  file_size <= 1_000_000_000 ? 8 :
-                  file_size <= 2_000_000_000 ? 16 :
-                  file_size <= 4_000_000_000 ? 32 : 64
+        def mem = file_size <= 100_000_000 ? 1 :
+                  file_size <= 1_000_000_000 ? 2 :
+                  file_size <= 2_000_000_000 ? 4 :
+                  file_size <= 4_000_000_000 ? 8 : 16
         "${mem * task.attempt} GB"
     }
 
