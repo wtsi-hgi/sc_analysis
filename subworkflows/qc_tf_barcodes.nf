@@ -75,6 +75,7 @@ process FILTER_TF_BARCODES {
     tuple val(sample_id), val(run_id), path(tf_barcode)
 
     output:
+    tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.tf_cutoff_plots.png"), emit: ch_tf_cutoff_plots
     tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.filtered_tfs.tsv"), emit: ch_filtered_tf
     tuple val(sample_id), val(run_id), path("${sample_id}_${run_id}.filtered_tfs_top.tsv"), emit: ch_filtered_tf_top, optional: true
 
