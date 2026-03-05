@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
-package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2")
+package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2", "patchwork")
 package_2 <- c("reshape2", "scales", "ggExtra", "ggrepel", "Ckmeans.1d.dp")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
@@ -34,8 +34,54 @@ setwd(opt$output_dir)
 sample_prefix <- ifelse(is.null(opt$prefix), opt$sample_id, opt$prefix)
 
 #-- processing --#
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> keeping TF barcodes with counts > 1 ...")
 tf_counts <- tf_counts[, .(count = sum(count)), by = .(cell_barcode, tf_name)]
+
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating the plot of TF barcodes ...")
+cutoff <- c(1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, 50)
+
+list_tf_nums <- lapply(cutoff, function(t) {
+    tf_counts[count > t, .(n_tf         = uniqueN(tf_name),
+                           mean_count   = as.numeric(mean(count)),
+                           median_count = as.numeric(median(count)),
+                           cutoff       = t), by = .(cell_barcode)]
+})
+names(list_tf_nums) <- paste0("count > ", cutoff)
+
+dt_tf_nums <- rbindlist(list_tf_nums)
+dt_tf_nums[, n_tf_group := ifelse(n_tf >= 20, "20+", as.character(n_tf))]
+dt_tf_nums[, n_tf_group := factor(n_tf_group, levels = c(as.character(1:19), "20+"))]
+
+dt_pct_cells <- dt_tf_nums[, .N, by = .(cutoff, n_tf_group)]
+dt_pct_cells[, pct := round(100 * N / sum(N), 2), by = cutoff]
+dt_pct_cells[, cutoff := factor(cutoff)]
+
+make_plot <- function(df, title_text)
+{
+    ggplot(df, aes(x = n_tf_group, y = pct, color = cutoff, group = cutoff)) +
+        geom_line(linewidth = 1.2) +
+        geom_point(size = 2) +
+        scale_colour_manual(values = alpha(c("tomato", "royalblue", "yellowgreen", "gold2"), 1)) +
+        labs(x = "Number of TFs per cell", y = "Percentage of cells (%)", title = title_text) +
+        theme_classic(base_size = 20) +
+        theme(
+            axis.text.x = element_text(angle = 45, hjust = 1, size = 16),
+            axis.text.y = element_text(size = 16),                        
+            axis.title = element_text(size = 18),
+            plot.title = element_text(size = 22),
+            legend.position = "bottom",
+            legend.text = element_text(size = 16),
+            legend.title = element_text(size = 18))
+}
+p1 <- make_plot(dt_pct_cells[cutoff %in% c(1,2,3,4)],     "count > 1–4")
+p2 <- make_plot(dt_pct_cells[cutoff %in% c(5,10,15,20)],  "count > 5–20")
+p3 <- make_plot(dt_pct_cells[cutoff %in% c(25,30,40,50)], "count > 25–50")
+combined_plot <- (p1 | p2 | p3)
+
+png(paste0(sample_prefix, ".tf_cutoff_plots.png"), width = 1800, height = 700)
+print(combined_plot)
+dev.off()
+
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> keeping TF barcodes with counts > 1 ...")
 tf_counts <- tf_counts[count > 1]
 tf_counts[, cell_barcode := paste0(cell_barcode, "-", opt$sample_id)]
 
