@@ -34,24 +34,32 @@ Usage:
 }
 
 /* -- initialising parameters -- */
-params.help           = null
+params.help             = null
+params.version          = false
+params.pipeline_name    = workflow.manifest.name
+params.pipeline_version = workflow.manifest.version
 
-params.sample_sheet   = null
-params.outdir         = params.outdir         ?: "$PWD"
+params.sample_sheet     = null
+params.outdir           = params.outdir         ?: "$PWD"
 
-params.del_ambient    = params.del_ambient    ?: false
-params.mark_doublet   = params.mark_doublet   ?: false
+params.del_ambient      = params.del_ambient    ?: false
+params.mark_doublet     = params.mark_doublet   ?: false
 
-params.tf_barcode_len = params.tf_barcode_len ?: 24
-params.marker_seq     = params.marker_seq     ?: "GAAAGGACGA"
-params.marker_start   = params.marker_start   ?: 25
-params.marker_end     = params.marker_end     ?: 50
-params.max_mismatch   = params.max_mismatch   ?: 1
-params.top_n          = params.top_n          ?: null
+params.tf_barcode_len   = params.tf_barcode_len ?: 24
+params.marker_seq       = params.marker_seq     ?: "GAAAGGACGA"
+params.marker_start     = params.marker_start   ?: 25
+params.marker_end       = params.marker_end     ?: 50
+params.max_mismatch     = params.max_mismatch   ?: 1
+params.top_n            = params.top_n          ?: null
 
 /* -- check parameters -- */
 if (params.help) {
     helpMessage()
+    exit 0
+}
+
+if (params.version) {
+    println "${workflow.manifest.version}"
     exit 0
 }
 
@@ -82,6 +90,23 @@ if (!file(params.outdir).isDirectory()) {
 
 /* -- workflow -- */
 workflow sc_analysis {
+    log.info """
+    =====================================
+    ${workflow.manifest.name}
+    Version: ${workflow.manifest.version}
+    =====================================
+    """
+
+    def sheet_file = file(params.sample_sheet)
+
+    log.info """
+    =====================================
+    Sample sheet content:
+    -------------------------------------
+    ${sheet_file.text}
+    =====================================
+    """
+
     /* -- check inputs -- */
     check_input_files(ch_input)
     ch_cr_files = check_input_files.out.ch_cr_files
@@ -91,14 +116,25 @@ workflow sc_analysis {
     qc_sc_multiome(ch_cr_files)
     ch_qced_object = qc_sc_multiome.out.ch_qced_object
     ch_qced_cells = qc_sc_multiome.out.ch_qced_cells
+    ch_qced_summary = qc_sc_multiome.out.ch_qced_summary
 
     /* -- step 2: QC TF barcodes -- */
     ch_input = ch_tf_files.join(ch_qced_cells, by: [0,1])
     qc_tf_barcodes(ch_input)
+    ch_qced_stats = qc_tf_barcodes.out.ch_qced_stats
+    ch_tf_cutoff_plots = qc_tf_barcodes.out.ch_tf_cutoff_plots
     ch_qced_tf = params.top_n == 0 ? qc_tf_barcodes.out.ch_filtered_tf : qc_tf_barcodes.out.ch_filtered_tf_top
 
     /* -- step 3: integration -- */
     ch_input = ch_qced_object.join(ch_qced_tf, by: [0,1])
     integrate_qced_data(ch_input)
     ch_integrated_qced = integrate_qced_data.out.ch_integrated_qced
+
+    /* -- step 4: reporting -- */
+    ch_input = ch_qced_summary.join(ch_qced_stats, by: [0,1])
+                              .join(ch_tf_cutoff_plots, by: [0,1])
+
+    
+
+
 }
