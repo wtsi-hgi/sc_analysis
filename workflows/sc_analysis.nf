@@ -1,6 +1,7 @@
 /* ---- single cell data analysis pipeline ---- */
 
 /* -- load modules -- */
+include { NOTE_CMD }                  from "$projectDir/modules/local/init_workflow/main"
 
 /* -- load subworkflows -- */
 include { check_input_files }   from '../subworkflows/check_input_files.nf'
@@ -38,6 +39,7 @@ params.help             = null
 params.version          = false
 params.pipeline_name    = workflow.manifest.name
 params.pipeline_version = workflow.manifest.version
+params.sanger_module               = params.sanger_module               ?: false
 
 params.sample_sheet     = null
 params.outdir           = params.outdir         ?: "$PWD"
@@ -90,24 +92,10 @@ if (!file(params.outdir).isDirectory()) {
 
 /* -- workflow -- */
 workflow sc_analysis {
-    log.info """
-    =====================================
-    ${workflow.manifest.name}
-    Version: ${workflow.manifest.version}
-    =====================================
-    """
+    /* -- note down the command line -- */
+    NOTE_CMD(workflow.commandLine)
 
-    def sheet_file = file(params.sample_sheet)
-
-    log.info """
-    =====================================
-    Sample sheet content:
-    -------------------------------------
-    ${sheet_file.text}
-    =====================================
-    """
-
-    /* -- check inputs -- */
+    /* -- check input files exist -- */
     check_input_files(ch_input)
     ch_cr_files = check_input_files.out.ch_cr_files
     ch_tf_files = check_input_files.out.ch_tf_files
