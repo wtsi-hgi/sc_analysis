@@ -1,0 +1,19 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema",
+	"title": "sc_analysis",
+	"description": "A nextflow pipeline of single cell data analysis",
+	"type": "object",
+	"properties": {
+		"sample_sheet": {
+			"type": "string",
+			"format": "file-path",
+			"description": "A sample sheet specifying sample meta information (csv or tsv)"
+		},
+		"outdir": {
+			"type": "string",
+			"description": "Output directory",
+			"default": "current working directory"
+		}
+	},
+	"required": ["sample_sheet", "outdir"]
+}
