@@ -28,18 +28,18 @@ process INTEGRATE_QCED_DATA {
     publishDir "${params.outdir}/qc_integration/${sample_id}", mode: "copy", overwrite: true
 
     input:
-    tuple val(sample_id), val(run_id), path(qced_rds), path(qced_tf)
+    tuple val(sample_id), val(rep_id), path(qced_rds), path(qced_tf)
 
     output:
     tuple val(sample_id), path("${sample_id}.integrated_qced.rds"), emit: ch_integrated_qced
 
     script:
-    def list_run_ids = run_id.join(',')
+    def list_rep_ids = rep_id.join(',')
     def list_qced_rds = qced_rds.join(',')
     def list_qced_tf = qced_tf.join(',')
 
     """
-    ${projectDir}/scripts/integrate_qced_data.R -s ${list_run_ids} \
+    ${projectDir}/scripts/integrate_qced_data.R -s ${list_rep_ids} \
                                                 -r ${list_qced_rds} \
                                                 -t ${list_qced_tf} \
                                                 -p ${sample_id}
