@@ -5,11 +5,13 @@ package_2 <- c("reshape2", "scales", "ggExtra", "ggrepel", "Ckmeans.1d.dp")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
-option_list <- list(make_option(c("-s", "--sample_id"),  type = "character", help = "sample ID",                     default = NULL),
-                    make_option(c("-t", "--tf_barcode"), type = "character", help = "TF barcode file",               default = NULL),
-                    make_option(c("-o", "--output_dir"), type = "character", help = "output directory",              default = getwd()),
-                    make_option(c("-p", "--prefix"),     type = "character", help = "output prefix",                 default = NULL),
-                    make_option("--top_n",               type = "integer",   help = "keep top N TFs, if 0 keep all", default = 0))
+option_list <- list(make_option(c("-s", "--sample_id"),  type = "character",    help = "sample ID",                     default = NULL),
+                    make_option(c("-t", "--tf_barcode"), type = "character",    help = "TF barcode file",               default = NULL),
+                    make_option(c("-u", "--has_umi"),    action = "store_true", help = "if cell barcode has UMI",       default = FALSE),
+                    make_option(c("-c", "--cutoff"),     type = "integer",      help = "cutoff for count filtering",    default = 0),
+                    make_option(c("-n", "--top_n"),      type = "integer",      help = "keep top N TFs, if 0 keep all", default = 0),
+                    make_option(c("-o", "--output_dir"), type = "character",    help = "output directory",              default = getwd()),
+                    make_option(c("-p", "--prefix"),     type = "character",    help = "output prefix",                 default = NULL))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -34,7 +36,13 @@ setwd(opt$output_dir)
 sample_prefix <- ifelse(is.null(opt$prefix), opt$sample_id, opt$prefix)
 
 #-- processing --#
-tf_counts <- tf_counts[, .(count = sum(count)), by = .(cell_barcode, tf_name)]
+if(opt$has_umi)
+{
+    tf_counts <- tf_counts[, .(count = uniqueN(read_umi)), by = .(cell_barcode, tf_name)]
+} else {
+    tf_counts <- tf_counts[, .(count = sum(count)), by = .(cell_barcode, tf_name)]
+}
+
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating the plot of TF barcodes ...")
 cutoff <- c(1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, 50)
@@ -85,19 +93,25 @@ message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id
 tf_counts <- tf_counts[count > 1]
 tf_counts[, cell_barcode := paste0(cell_barcode, "-", opt$sample_id)]
 
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> clustering TF barcodes by the counts ...")
-tf_counts[, cluster := {
-    if (.N > 10) {
-        ck <- Ckmeans.1d.dp(log2(count), k = 2, y = 1)$cluster
-        ck
-    } else {
-        rep(2L, .N)
-    }
-}, by = cell_barcode]
+if(opt$cutoff == 0)
+{
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> clustering TF barcodes by the counts ...")
+    tf_counts[, cluster := {
+        if (.N > 10) {
+            ck <- Ckmeans.1d.dp(log2(count), k = 2, y = 1)$cluster
+            ck
+        } else {
+            rep(2L, .N)
+        }
+    }, by = cell_barcode]
 
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> filtering TF barcodes by the clusters ...")
-tf_counts_f <- tf_counts[cluster == 2]
-tf_counts_f[, cluster := NULL]
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> filtering TF barcodes by the clusters ...")
+    tf_counts_f <- tf_counts[cluster == 2]
+    tf_counts_f[, cluster := NULL]
+} else {
+    message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> filtering TF barcodes by the cutoff ...")
+    tf_counts_f <- tf_counts[count > opt$cutoff]
+}
 
 fwrite(tf_counts_f, paste0(sample_prefix, ".filtered_tfs.tsv"), row.names = F, sep = "\t")
 
