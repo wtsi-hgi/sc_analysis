@@ -87,6 +87,10 @@ The pipeline is designed for single-cell multiome analysis, including scRNA-seq,
 
 ### Sample Sheet
 
+| sample_id | rep_id | dir_cellranger_arc | r1_tf_barcodes | r2_tf_barcodes | tf_barcodes |
+|-|-|-|-|-|-|
+| morf10 | B1 | /path/of/cellranger_arc/ | /path/of/R1.fastq.gz | /path/of/R2.fastq.gz | /path/of/tf_barcodes.tsv |
+| morf10 | B2 | /path/of/cellranger_arc/ | /path/of/R1.fastq.gz | /path/of/R2.fastq.gz | /path/of/tf_barcodes.tsv |
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -101,13 +105,4 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 Example
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
-TF plot:
-y -> median no. of TFs
-x -> differnt tf count filters (> 1,2,3 etc..)
-
-report:
-summary/stats -> html report
-
-h5 outputs + matrix tvs files
 
