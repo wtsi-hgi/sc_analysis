@@ -140,7 +140,7 @@ def process_pe_pair(read_pair: tuple) -> list:
     
     read1_cb = read1_seq[:16]
     if args.has_umi:
-        read1_umi = read1_seq[16:26]
+        read1_umi = read1_seq[16:]
     else:
         read1_umi = "no_umi"
 
