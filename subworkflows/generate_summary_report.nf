@@ -3,7 +3,7 @@ workflow generate_summary_report {
     ch_input
 
     main:
-    ch_sample.map { sample_id, run_id, qc_sc_stats, qc_sc_rna_plots, qc_sc_atac_plots, qc_tf_stats, qc_tf_cutoff_plots }
+    ch_sample.map { sample_id, rep_id, qc_sc_stats, qc_sc_rna_plots, qc_sc_atac_plots, qc_tf_stats, qc_tf_cutoff_plots }
 }
 
 process CREATE_HTML_REPORT {
@@ -21,13 +21,13 @@ process CREATE_HTML_REPORT {
     publishDir "${params.outdir}/qc_report", mode: "copy", overwrite: true
 
     input:
-    tuple val(sample_id), val(run_id), val(qc_sc_stats), val(qc_sc_rna_plots), val(qc_sc_atac_plots), val(qc_tf_stats), val(qc_tf_cutoff_plots)
+    tuple val(sample_id), val(rep_id), val(qc_sc_stats), val(qc_sc_rna_plots), val(qc_sc_atac_plots), val(qc_tf_stats), val(qc_tf_cutoff_plots)
 
     output:
     tuple val(sample_id), path("${sample_id}.qced_summary.html"), emit: ch_qced_summary
 
     script:
-    def list_run_ids = run_id.join(',')
+    def list_rep_ids = rep_id.join(',')
     def list_qc_sc_stats = qc_sc_stats.join(',')
     def list_qc_sc_rna_plots = qc_sc_rna_plots.join(',')
     def list_qc_sc_atac_plots = qc_sc_atac_plots.join(',')

@@ -39,7 +39,7 @@ params.help             = null
 params.version          = false
 params.pipeline_name    = workflow.manifest.name
 params.pipeline_version = workflow.manifest.version
-params.sanger_module               = params.sanger_module               ?: false
+params.sanger_module    = params.sanger_module               ?: false
 
 params.sample_sheet     = null
 params.outdir           = params.outdir         ?: "$PWD"
@@ -70,7 +70,7 @@ if (params.sample_sheet) {
     ch_input = Channel.fromPath(file(params.sample_sheet), checkIfExists: true)
                       .splitCsv(header: true, sep: sep)
     
-    def required_cols = ['sample_id', 'run_id', 'dir_cellranger_arc', 'r1_tf_barcodes', 'r2_tf_barcodes', 'tf_barcodes']
+    def required_cols = ['sample_id', 'rep_id', 'dir_cellranger_arc', 'r1_tf_barcodes', 'r2_tf_barcodes', 'tf_barcodes']
     def header_line = new File(params.sample_sheet).readLines().head()
     def header = header_line.split(sep)
     def missing = required_cols.findAll { !(it in header) }
@@ -113,16 +113,6 @@ workflow sc_analysis {
     ch_tf_cutoff_plots = qc_tf_barcodes.out.ch_tf_cutoff_plots
     ch_qced_tf = params.top_n == 0 ? qc_tf_barcodes.out.ch_filtered_tf : qc_tf_barcodes.out.ch_filtered_tf_top
 
-    /* -- step 3: integration -- */
-    ch_input = ch_qced_object.join(ch_qced_tf, by: [0,1])
-    integrate_qced_data(ch_input)
-    ch_integrated_qced = integrate_qced_data.out.ch_integrated_qced
-
-    /* -- step 4: reporting -- */
-    ch_input = ch_qced_summary.join(ch_qced_stats, by: [0,1])
-                              .join(ch_tf_cutoff_plots, by: [0,1])
-
-    
 
 
 }

@@ -20,11 +20,11 @@ process CHECK_FILES {
     label 'process_single'
 
     input:
-    tuple val(sample_id), val(run_id), val(dir_cellranger_arc), val(r1_tf_barcodes), val(r2_tf_barcodes), val(tf_barcodes)
+    tuple val(sample_id), val(rep_id), val(dir_cellranger_arc), val(r1_tf_barcodes), val(r2_tf_barcodes), val(tf_barcodes)
 
     output:
-    tuple val(sample_id), val(run_id), path("${sample_id}.cr_raw.h5"), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), path("${sample_id}.cr_atac.tsv.gz.tbi"), emit: ch_cr_files
-    tuple val(sample_id), val(run_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.{tsv,csv}"), emit: ch_tf_files
+    tuple val(sample_id), val(rep_id), path("${sample_id}.cr_raw.h5"), path("${sample_id}.cr_gex.h5"), path("${sample_id}.cr_atac.tsv.gz"), path("${sample_id}.cr_atac.tsv.gz.tbi"), emit: ch_cr_files
+    tuple val(sample_id), val(rep_id), path("${sample_id}.tf_barcodes.r1.fastq.gz"), path("${sample_id}.tf_barcodes.r2.fastq.gz"), path("${sample_id}.tf_barcodes.{tsv,csv}"), emit: ch_tf_files
 
     script:
     def file_cr_raw = file("${dir_cellranger_arc}/raw_feature_bc_matrix.h5")
