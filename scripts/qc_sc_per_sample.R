@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
-package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2", "ggrepel", "EnsDb.Hsapiens.v86", "clusterProfiler")
-package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "DoubletFinder", "GenomicRanges", "GenomeInfoDb", "AnnotationHub", "scDblFinder")
+package_1 <- c("optparse", "tidyverse", "data.table", "ggplot2", "ggrepel", "EnsDb.Hsapiens.v86", "clusterProfiler", "GenomicRanges", "GenomeInfoDb", "AnnotationHub")
+package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "DoubletFinder", "scDblFinder")
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
@@ -69,18 +69,17 @@ if(opt$del_ambient)
 }
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating the seurat object ...")
-
+data_gex <- Read10X_h5(opt$gex_file)
 if(opt$del_ambient)
 {
     obj <- CreateSeuratObject(counts = adj_counts, assay = "RNA")
-} else {
-    data_gex <- Read10X_h5(opt$gex_file)
+    rm(adj_counts)
+} else {    
     obj <- CreateSeuratObject(counts = data_gex[["Gene Expression"]], assay = "RNA")
 }
 obj[["ATAC"]] <- CreateChromatinAssay(counts = data_gex$Peaks, fragments = opt$atac_file, annotation = annotations, sep = c(":", "-"))
 
 rm(data_gex)
-rm(adj_counts)
 invisible(gc(verbose = FALSE))
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> QC RNA ...")
