@@ -3,20 +3,15 @@ workflow generate_summary_report {
     ch_input
 
     main:
-    ch_sample.map { sample_id, rep_id, qc_sc_stats, qc_sc_rna_plots, qc_sc_atac_plots, qc_tf_stats, qc_tf_cutoff_plots }
+    CREATE_HTML_REPORT(ch_input)
+    ch_qced_summary = CREATE_HTML_REPORT.out.ch_qced_summary
+
+    emit:
+    ch_qced_summary
 }
 
 process CREATE_HTML_REPORT {
-    label 'process_single_dynamic_memory'
-
-    memory {
-        def file_size = qc_sc_stats.size() + qc_tf_stats.size()
-        def mem = file_size <= 10_000_000_000 ? 4 :
-                  file_size <= 20_000_000_000 ? 8 :
-                  file_size <= 40_000_000_000 ? 16 :
-                  file_size <= 80_000_000_000 ? 32 : 64
-        "${mem * task.attempt} GB"
-    }
+    label 'process_single'
 
     publishDir "${params.outdir}/qc_report", mode: "copy", overwrite: true
 
@@ -27,14 +22,16 @@ process CREATE_HTML_REPORT {
     tuple val(sample_id), path("${sample_id}.qced_summary.html"), emit: ch_qced_summary
 
     script:
-    def list_rep_ids = rep_id.join(',')
-    def list_qc_sc_stats = qc_sc_stats.join(',')
-    def list_qc_sc_rna_plots = qc_sc_rna_plots.join(',')
-    def list_qc_sc_atac_plots = qc_sc_atac_plots.join(',')
-    def list_qc_tf_stats = qc_tf_stats.join(',')
-    def list_qc_tf_cutoff_plots = qc_tf_cutoff_plots.join(',')
-
     """
+    ${projectDir}/scripts/create_html_report.R -r ${projectDir}/scripts \
+                                               -s ${sample_id}_${rep_id} \
+                                               -t ${qc_sc_stats} \
+                                               -m ${qc_sc_rna_plots} \
+                                               -f ${qc_sc_atac_plots} \
+                                               -a ${qc_tf_stats} \
+                                               -c ${qc_tf_cutoff_plots} \
+                                               -w ${params.pipeline_name} \
+                                               -v ${params.pipeline_version}
 
     """
 }

@@ -1,13 +1,14 @@
 /* ---- single cell data analysis pipeline ---- */
 
 /* -- load modules -- */
-include { NOTE_CMD }                  from "$projectDir/modules/local/init_workflow/main"
+include { NOTE_CMD }                from "$projectDir/modules/local/init_workflow/main"
+include { CREATE_PY_INPUTS }        from "$projectDir/modules/local/create_py_inputs/main"
 
 /* -- load subworkflows -- */
-include { check_input_files }   from '../subworkflows/check_input_files.nf'
-include { qc_sc_multiome }      from '../subworkflows/qc_sc_multiome.nf'
-include { qc_tf_barcodes }      from '../subworkflows/qc_tf_barcodes.nf'
-include { integrate_qced_data } from '../subworkflows/integrate_qced_data.nf'
+include { check_input_files }       from "$projectDir/subworkflows/check_input_files.nf"
+include { qc_sc_multiome }          from "$projectDir/subworkflows/qc_sc_multiome.nf"
+include { qc_tf_barcodes }          from "$projectDir/subworkflows/qc_tf_barcodes.nf"
+include { generate_summary_report } from "$projectDir/subworkflows/generate_summary_report.nf"
 
 /* -- define functions -- */
 def helpMessage() {
@@ -113,6 +114,12 @@ workflow sc_analysis {
     ch_tf_cutoff_plots = qc_tf_barcodes.out.ch_tf_cutoff_plots
     ch_qced_tf = params.top_n == 0 ? qc_tf_barcodes.out.ch_filtered_tf : qc_tf_barcodes.out.ch_filtered_tf_top
 
+    /* -- step 3: create output files for python packages -- */
+    ch_input = ch_qced_object.join(ch_qced_tf, by: [0,1])
+    CREATE_PY_INPUTS(ch_input)
 
-
+    /* -- step 4: create html report -- */
+    ch_input = ch_qced_summary.join(ch_qced_stats, by: [0,1])
+                              .join(ch_tf_cutoff_plots, by: [0,1])
+    generate_summary_report(ch_input)
 }
