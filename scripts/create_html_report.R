@@ -4,17 +4,17 @@ packages <- c("tidyverse", "data.table", "vroom", "ggVennDiagram", "htmltools", 
 invisible(lapply(packages, quiet_library))
 
 # -- options -- #
-option_list <- list(make_option(c("-r", "--rscript_dir"),        type = "character", help = "directory path of R scripts",             default = NULL),
-                    make_option(c("-s", "--run_id"),             type = "character", help = "list of run IDs",                         default = NULL),
-                    make_option(c("-t", "--qc_sc_stats"),        type = "character", help = "list of QC single-cell stats files",      default = NULL),
-                    make_option(c("-m", "--qc_sc_rna_plots"),    type = "character", help = "list of QC single-cell RNA plots files",  default = NULL),
-                    make_option(c("-f", "--qc_sc_atac_plots"),   type = "character", help = "list of QC single-cell ATAC plots files", default = NULL),
-                    make_option(c("-a", "--qc_tf_stats"),        type = "character", help = "list of QC TF stats files",               default = NULL),
-                    make_option(c("-c", "--qc_tf_cutoff_plots"), type = "character", help = "list of QC TF cutoff plots files",        default = NULL),
-                    make_option(c("-o", "--output_dir"),         type = "character", help = "output directory",                        default = getwd()),
-                    make_option(c("-p", "--prefix"),             type = "character", help = "output prefix",                           default = "sample"),
-                    make_option(c("-w", "--name"),               type = "character", help = "pipeline name",                           default = "sc_analysis"),
-                    make_option(c("-v", "--version"),            type = "character", help = "pipeline version",                        default = "dev"))
+option_list <- list(make_option(c("-r", "--rscript_dir"),        type = "character", help = "directory path of R scripts",     default = NULL),
+                    make_option(c("-s", "--sample_id"),          type = "character", help = "sample ID",                       default = NULL),
+                    make_option(c("-t", "--qc_sc_stats"),        type = "character", help = "QC single-cell stats file",       default = NULL),
+                    make_option(c("-m", "--qc_sc_rna_plots"),    type = "character", help = "QC single-cell RNA plots files",  default = NULL),
+                    make_option(c("-f", "--qc_sc_atac_plots"),   type = "character", help = "QC single-cell ATAC plots files", default = NULL),
+                    make_option(c("-a", "--qc_tf_stats"),        type = "character", help = "QC TF stats files",               default = NULL),
+                    make_option(c("-c", "--qc_tf_cutoff_plots"), type = "character", help = "QC TF cutoff plots files",        default = NULL),
+                    make_option(c("-o", "--output_dir"),         type = "character", help = "output directory",                default = getwd()),
+                    make_option(c("-p", "--prefix"),             type = "character", help = "output prefix",                   default = NULL),
+                    make_option(c("-w", "--name"),               type = "character", help = "pipeline name",                   default = "sc_analysis"),
+                    make_option(c("-v", "--version"),            type = "character", help = "pipeline version",                default = "dev"))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -26,382 +26,37 @@ if(length(commandArgs(trailingOnly = TRUE)) == 0)
 }
 
 # -- check options -- #
-if(is.null(opt$rscript_dir))          stop("-r, directory path of R scripts is required!", call. = FALSE)
-if(is.null(opt$lib_type))             stop("-l, library type is required!", call. = FALSE)
-if(is.null(opt$barcode_association))  stop("-b, barcode association file is required!", call. = FALSE)
-if(is.null(opt$exon_pos))             stop("-e, exon position file is required!", call. = FALSE)
-if(is.null(opt$sample_id))            stop("-s, list of sample IDs is required!", call. = FALSE)
-if(is.null(opt$trim_stats))           stop("-t, list of trim stats files is required!", call. = FALSE)
-if(is.null(opt$merge_stats))          stop("-m, list of merge stats files is required!", call. = FALSE)
-if(is.null(opt$bwa_idxstats))         stop("-f, list of bwa map idxstats files is required!", call. = FALSE)
-if(is.null(opt$hisat2_stats))         stop("-a, list of hisat2 map summary files is required!", call. = FALSE)
-if(is.null(opt$canonical_barcodes))   stop("-c, list of extracted canonical barcode files is required!", call. = FALSE)
-if(is.null(opt$novel_barcodes))       stop("-n, list of extracted novel barcode files is required!", call. = FALSE)
-if(is.null(opt$classified_junctions)) stop("-j, list of classified junction file is required!", call. = FALSE)
-if(is.null(opt$psi_results))          stop("-d, list of psi files (canon_only and all_events)!", call. = FALSE)
-
-valid_lib_types <- c("random_intron", "random_exon", "muta_intron", "muta_exon")
-if(!(opt$lib_type %in% valid_lib_types))
-{
-    stop(paste0("-l, library type must be one of: ", paste(valid_lib_types, collapse = ", ")), call. = FALSE)
-}
+if(is.null(opt$rscript_dir))        stop("-r, directory path of R scripts is required!", call. = FALSE)
+if(is.null(opt$sample_id))          stop("-s, sample ID is required!", call. = FALSE)
+if(is.null(opt$qc_sc_stats))        stop("-t, QC single-cell stats file is required!", call. = FALSE)
+if(is.null(opt$qc_sc_rna_plots))    stop("-m, QC single-cell RNA plots files is required!", call. = FALSE)
+if(is.null(opt$qc_sc_atac_plots))   stop("-f, QC single-cell ATAC plots files is required!", call. = FALSE)
+if(is.null(opt$qc_tf_stats))        stop("-a, QC TF stats files is required!", call. = FALSE)
+if(is.null(opt$qc_tf_cutoff_plots)) stop("-c, QC TF cutoff plots files is required!", call. = FALSE)
 
 # -- modules -- #
 source(file.path(opt$rscript_dir, "report_utils.R"))
-source(file.path(opt$rscript_dir, "report_plots.R"))
 source(file.path(opt$rscript_dir, "report_html.R"))
 
 # -- inputs -- #
-sample_reps                <- unlist(strsplit(opt$sample_id, ","))
-files_trim_stats           <- unlist(strsplit(opt$trim_stats, ","))
-files_merge_stats          <- unlist(strsplit(opt$merge_stats, ","))
-files_bwa_idxstats         <- unlist(strsplit(opt$bwa_idxstats, ","))
-files_hisat2_stats         <- unlist(strsplit(opt$hisat2_stats, ","))
-files_canonical_barcodes   <- unlist(strsplit(opt$canonical_barcodes, ","))
-files_novel_barcodes       <- unlist(strsplit(opt$novel_barcodes, ","))
-files_classified_junctions <- unlist(strsplit(opt$classified_junctions, ","))
-
-sample_reps                <- mixedsort(sample_reps)
-files_trim_stats           <- sort_paths_by_filename(files_trim_stats)
-files_merge_stats          <- sort_paths_by_filename(files_merge_stats)
-files_bwa_idxstats         <- sort_paths_by_filename(files_bwa_idxstats)
-files_hisat2_stats         <- sort_paths_by_filename(files_hisat2_stats)
-files_canonical_barcodes   <- sort_paths_by_filename(files_canonical_barcodes)
-files_novel_barcodes       <- sort_paths_by_filename(files_novel_barcodes)
-files_classified_junctions <- sort_paths_by_filename(files_classified_junctions)
-
-files_psi_results          <- unlist(strsplit(opt$psi_results, ","))
 
 # -- outputs -- #
 if(!dir.exists(opt$output_dir)) dir.create(opt$output_dir, recursive = TRUE)
 setwd(opt$output_dir)
 
-sample_prefix <- opt$prefix
-
-# -- reading files -- #
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Reading input files ...")
-
-barcode_association <- as.data.table(vroom(opt$barcode_association, delim = "\t", comment = "#", show_col_types = FALSE, col_names = TRUE, col_select = c("barcode", "var_id")))
-exon_pos <- as.data.table(vroom(opt$exon_pos, delim = "\t", comment = "#", col_names = FALSE, show_col_types = FALSE))
-setnames(exon_pos, c("var_id", "exon_id", "exon_start", "exon_end"))
-
-dt_psi_can <- as.data.table(vroom(files_psi_results[1], delim = "\t", comment = "#", col_names = TRUE, show_col_types = FALSE))
-dt_psi_all <- as.data.table(vroom(files_psi_results[2], delim = "\t", comment = "#", col_names = TRUE, show_col_types = FALSE))
-
-total_reads <- numeric(length(sample_reps))
-
-merged_reads <- numeric(length(sample_reps))
-unmerged_reads <- numeric(length(sample_reps))
-
-inclusion_reads <- numeric(length(sample_reps))
-skipping_reads <- numeric(length(sample_reps))
-
-map_reads <- numeric(length(sample_reps))
-unexplain_reads <- numeric(length(sample_reps))
-
-canonical_barcodes <- list()
-novel_barcodes <- list()
-
-classified_junctions <- list()
-
-for(i in seq_along(sample_reps))
-{
-    tmp_value <- as.numeric(str_extract(grep("reads passed filter:", readLines(files_trim_stats[i]), value = TRUE), "\\d+"))
-    total_reads[i] <- tmp_value / 2
-
-    merged_reads[i] <- as.numeric(str_extract(grep("Combined pairs:", readLines(files_merge_stats[i]), value = TRUE), "\\d+"))
-    unmerged_reads[i] <- as.numeric(str_extract(grep("Uncombined pairs:", readLines(files_merge_stats[i]), value = TRUE), "\\d+"))
-
-    # exon library has multiple lines for inclusion reads
-    tmp_dt <- read.table(files_bwa_idxstats[i])
-    inclusion_reads[i] <- as.numeric(sum(tmp_dt[grep("_inclusion", tmp_dt$V1), 2]))
-    skipping_reads[i] <- as.numeric(sum(tmp_dt[grep("_skipping", tmp_dt$V1), 2]))
-
-    map_reads[i] <- as.numeric(read.table(files_hisat2_stats[i])[1, 2])
-    unexplain_reads[i] <- as.numeric(read.table(files_hisat2_stats[i])[2, 2]) - as.numeric(read.table(files_hisat2_stats[i])[1, 2])
-
-    canonical_barcodes[[sample_reps[i]]] <- as.data.table(vroom(files_canonical_barcodes[i], delim = "\t", comment = "#", col_names = TRUE, show_col_types = FALSE))
-    novel_barcodes[[sample_reps[i]]] <- as.data.table(vroom(files_novel_barcodes[i], delim = "\t", comment = "#", col_names = TRUE, show_col_types = FALSE))
-
-    classified_junctions[[sample_reps[i]]] <- as.data.table(vroom(files_classified_junctions[i], delim = "\t", comment = "#", col_names = TRUE, show_col_types = FALSE))
-}
-
-# -- processing -- #
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Preparing tables and figures ...")
-
-# 1. bar plots for statistics of sequencing reads
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "    |--> Creating read summaries and plots ...")
-
-data_barplots <- create_barplots(barcode_association, sample_reps, total_reads, merged_reads, unmerged_reads, inclusion_reads, skipping_reads, map_reads, unexplain_reads)
-summary_reads <- data_barplots[[1]]
-summary_pct <- data_barplots[[2]]
-barplots_combined <- wrap_plots(data_barplots[[3]], nrow = 1)
-
-fwrite(summary_reads, file = paste0(sample_prefix, ".summary_reads.tsv"), sep = "\t", row.names = FALSE)
-fwrite(summary_pct, file = paste0(sample_prefix, ".summary_pct.tsv"), sep = "\t", row.names = FALSE)
-
-png(paste0(sample_prefix, ".reads_pct.png"), width = 800, height = 800, units = "px", res = 130)
-barplots_combined
-invisible(dev.off())
-
-# 2. venn diagrams for detected barcodes and talbes of detected barcodes and variants
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "    |--> Creating barcode summaries and plots ...")
-
-venn_diagrams <- create_venn_diagrams(canonical_barcodes, novel_barcodes, barcode_association)
-venn_diagrams_combined <- wrap_plots(venn_diagrams, nrow = 1)
-
-png(paste0(sample_prefix, ".barcodes_venn.png"), width = 1800, height = 600, units = "px", res = 120)
-venn_diagrams_combined
-invisible(dev.off())
-
-num_detected_barcodes <- numeric(length(sample_reps))
-num_detected_variants <- numeric(length(sample_reps))
-barcode_association_num <- barcode_association[, .(num_barcodes = uniqueN(barcode)), by = var_id]
-library_barcodes_num <- list()
-mean_count_per_barcode <- vector()
-mean_count_per_variant <- vector()
-mean_pct_recovered_barcodes <- vector()
-for(i in seq_along(sample_reps))
-{
-    num_detected_barcodes[i] <- length(intersect(unique(c(canonical_barcodes[[i]]$barcode, 
-                                                          novel_barcodes[[i]]$barcode)),
-                                                 barcode_association$barcode))
-
-    num_detected_variants[i] <- length(unique(c(canonical_barcodes[[i]]$var_id, 
-                                                novel_barcodes[[i]]$var_id))) - 1 # there is NAs in var_id
-
-    library_barcodes <- rbindlist(list(canonical_barcodes[[i]][var_id != "NA", .(var_id, barcode, count)], 
-                                            novel_barcodes[[i]][var_id != "NA", .(var_id, barcode, count)])
-                                      )[, .(count = sum(count)), by = .(var_id, barcode)]
-
-    mean_count_per_barcode[i] <- mean(library_barcodes$count)
-    mean_count_per_variant[i] <- mean(library_barcodes[, .(sum_count = sum(count)), by = var_id]$sum_count)
-
-    library_barcodes_num[[i]] <- merge(barcode_association_num, 
-                                       library_barcodes[, .(num_barcodes = uniqueN(barcode)), by = var_id], 
-                                       by = "var_id", all.x = TRUE)
-    setnames(library_barcodes_num[[i]], c("var_id", "asso_num_barcodes", "lib_num_barcodes"))
-    library_barcodes_num[[i]][is.na(lib_num_barcodes), lib_num_barcodes := 0]
-    library_barcodes_num[[i]][, pct_lib_vs_asso := 100 * lib_num_barcodes / asso_num_barcodes]
-
-    mean_pct_recovered_barcodes[i] <- mean(library_barcodes_num[[i]]$pct_lib_vs_asso)
-
-    # ---- free memory ----
-    canonical_barcodes[[i]] <- data.table()
-    novel_barcodes[[i]] <- data.table()
-    rm(library_barcodes)
-    invisible(gc(verbose = FALSE))
-}
-
-summary_barvars <- data.table(samples_reps = sample_reps,
-                              num_expected_barcodes = rep(length(barcode_association$barcode), 3),
-                              num_expected_variants = rep(length(unique(barcode_association$var_id)), 3),
-                              num_detected_barcodes = num_detected_barcodes,
-                              num_detected_variants = num_detected_variants)
-summary_barvars[, `:=`( pct_detected_barcodes = round(100 * num_detected_barcodes / num_expected_barcodes, 2),
-                        pct_detected_variants = round(100 * num_detected_variants / num_expected_variants, 2),
-                        mean_pct_recovered_barcodes = round(mean_pct_recovered_barcodes, 2),
-                        mean_count_per_barcode = round(mean_count_per_barcode, 2),
-                        mean_count_per_variant = round(mean_count_per_variant, 2) )]
-
-fwrite(summary_barvars, file = paste0(sample_prefix, ".summary_barvars.tsv"), sep = "\t", row.names = FALSE)
-
-# ---- free memory ----
-rm(barcode_association)
-invisible(gc(verbose = FALSE))
-
-# 3. venn diagrams for detected junctions and correlation of junction quantifications
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "    |--> Creating junction correlation plot ...")
-
-junction_plots <- create_junction_plots(classified_junctions)
-
-# ---- free memory ----
-rm(classified_junctions)
-invisible(gc(verbose = FALSE))
-
-png(paste0(sample_prefix, ".junctions_venn.png"), width = 800, height = 800, units = "px", res = 150)
-print(junction_plots[[1]])
-invisible(dev.off())
-
-junctions_category <- junction_plots[[2]]
-fwrite(junctions_category, file = paste0(sample_prefix, ".junctions_category.tsv"), sep = "\t", row.names = FALSE)
-
-# ---- free memory ----
-rm(junction_plots)
-invisible(gc(verbose = FALSE))
-
-cor_data <- junctions_category[, ..sample_reps]
-cor_data[is.na(cor_data)] <- 0
-cor_data_norm <- cor_data %>% mutate(across(everything(), ~ log2((. / sum(.)) * 1e6 + 1)))
-
-png(paste0(sample_prefix, ".junctions_corr.png"), width = 1200, height = 1200, units = "px", res = 150)
-pairs(cor_data_norm,
-      upper.panel = panel.cor,
-      diag.panel = panel.hist,
-      lower.panel = function(x, y, ...) {panel.smooth(x, y, method = "lm", ...)},
-      use = "complete.obs")
-invisible(dev.off())
-
-# ---- free memory ----
-rm(cor_data)
-rm(cor_data_norm)
-invisible(gc(verbose = FALSE))
-
-# 4. upset plots for splicing events and tables of splicing events
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "    |--> Creating junction category plot ...")
-
-junctions_category_reshape <- junctions_category %>%
-                                separate_rows(annotation, sep = ";") %>%
-                                select(c(var_id, annotation, avg_cov)) %>%
-                                group_by(var_id, annotation) %>%
-                                summarise(avg_cov = sum(avg_cov, na.rm = TRUE), .groups = "drop") %>%
-                                mutate(log_avg_cov = log2(avg_cov + 1)) %>%
-                                select(c(var_id, annotation, log_avg_cov)) %>% 
-                                filter(annotation != "no_annotation")
-upset_input <- junctions_category_reshape %>%
-                distinct(var_id, annotation) %>%
-                mutate(value = 1) %>%
-                pivot_wider(names_from = annotation, values_from = value, values_fill = 0)
-upset_join <- junctions_category_reshape %>% left_join(upset_input, by = "var_id")
-
-png(paste0(sample_prefix, ".junctions_category.png"), width = 2400, height = 1600, units = "px", res = 200)
-upset(as.data.frame(upset_join), 
-      sets = unique(upset_join$annotation), 
-      order.by = "freq", 
-      matrix.color = "yellowgreen",
-      main.bar.color = "royalblue", 
-      sets.bar.color = "yellowgreen",
-      boxplot.summary = c("log_avg_cov"))
-invisible(dev.off())
-
-# ---- free memory ----
-rm(junctions_category_reshape)
-rm(upset_input)
-rm(upset_join)
-invisible(gc(verbose = FALSE))
-
-# 5. psi correlation of splicing events
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "    |--> Creating PSI plot ...")
-
-# canonical splicing events
-plot_psi <- dt_psi_can[, .(psi1, psi2, psi3, psi_shrunk)]
-plot_psi <- plot_psi[complete.cases(plot_psi)]
-setnames(plot_psi, colnames(plot_psi), c(sample_reps, "corrected_psi"))
-
-png(paste0(sample_prefix, ".psi_canon_only.corr.png"), width = 1200, height = 1200, units = "px", res = 100)
-pairs(plot_psi,
-      upper.panel = panel.cor,
-      diag.panel = panel.hist,
-      lower.panel = function(x, y, ...) {panel.smooth(x, y, method = "lm", ...)},
-      use = "complete.obs")
-invisible(dev.off())
-
-plot_psi <- dt_psi_can[, .(var_id, psi1, psi2, psi3, ratio1, ratio2, ratio3, n_total1, n_total2, n_total3, psi_shrunk)]
-setnames(plot_psi, "psi_shrunk", "corrected_psi")
-fwrite(plot_psi, file = paste0(sample_prefix, ".psi_canon_only.tsv"), sep = "\t", row.names = FALSE)
-
-# all splicing events
-plot_psi <- dt_psi_all[, .(psi1, psi2, psi3, psi_shrunk)]
-plot_psi <- plot_psi[complete.cases(plot_psi)]
-setnames(plot_psi, colnames(plot_psi), c(sample_reps, "corrected_psi"))
-
-png(paste0(sample_prefix, ".psi_all_events.corr.png"), width = 1200, height = 1200, units = "px", res = 100)
-pairs(plot_psi,
-      upper.panel = panel.cor,
-      diag.panel = panel.hist,
-      lower.panel = function(x, y, ...) {panel.smooth(x, y, method = "lm", ...)},
-      use = "complete.obs")
-invisible(dev.off())
-
-plot_psi <- dt_psi_all[, .(var_id, psi1, psi2, psi3, ratio1, ratio2, ratio3, n_total1, n_total2, n_total3, psi_shrunk)]
-setnames(plot_psi, "psi_shrunk", "corrected_psi")
-fwrite(plot_psi, file = paste0(sample_prefix, ".psi_all_events.tsv"), sep = "\t", row.names = FALSE)
-
-# ---- free memory ----
-rm(dt_psi_can)
-rm(dt_psi_all)
-rm(plot_psi)
-invisible(gc(verbose = FALSE))
-
-# 6. junction distribution plots
-message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "    |--> Creating junction distribution plot ...")
-
-data_rescale <- rescale_junctions(sample_reps, junctions_category, exon_pos, opt$lib_type)
-junctions_rescale <- data_rescale[[1]]
-exons_template <- data_rescale[[2]]
-introns_template <- data_rescale[[3]]
-
-# ---- free memory ----
-rm(data_rescale)
-invisible(gc(verbose = FALSE))
-
-junctions_distri <- create_junction_distribution(junctions_rescale, exons_template, introns_template)
-junctions_range <- junctions_distri[[1]]
-junctions_diagramplot <- junctions_distri[[2]]
-junctions_scatterplot <- junctions_distri[[3]]
-
-# ---- free memory ----
-rm(junctions_distri)
-rm(junctions_rescale)
-rm(exons_template)
-rm(introns_template)
-invisible(gc(verbose = FALSE))
-
-for(i in seq_along(junctions_range))
-{
-    png(paste0(sample_prefix, ".junctions_diagram_range_", i, ".png"), width = 1600, height = 600, units = "px", res = 200)
-    print(junctions_diagramplot[[i]])
-    invisible(dev.off())
-
-    png(paste0(sample_prefix, ".junctions_scatter_range_", i, ".png"), width = 1600, height = 1400, units = "px", res = 200)
-    print(junctions_scatterplot[[i]])
-    invisible(dev.off())
-}
-
-# ---- free memory ----
-rm(junctions_diagramplot)
-rm(junctions_scatterplot)
-invisible(gc(verbose = FALSE))
+sample_prefix <- if(!is.null(opt$prefix)) opt$prefix else opt$sample_id
 
 # -- reporting -- #
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Creating final html report...")
 
-file_summary_reads <- paste0(sample_prefix, ".summary_reads.tsv")
-file_summary_pct <- paste0(sample_prefix, ".summary_pct.tsv")
-plot_reads_pct <- paste0(sample_prefix, ".reads_pct.png")
-plot_barcodes_venn <- paste0(sample_prefix, ".barcodes_venn.png")
-file_barcodes_summary <- paste0(sample_prefix, ".summary_barvars.tsv")
-plot_junctions_venn <- paste0(sample_prefix, ".junctions_venn.png")
-plot_junctions_corr <- paste0(sample_prefix, ".junctions_corr.png")
-plot_junctions_category <- paste0(sample_prefix, ".junctions_category.png")
-file_junctions_category <- paste0(sample_prefix, ".junctions_category.tsv")
-list_files_junctions_diagram <- list.files(pattern = paste0(sample_prefix, ".junctions_diagram_range_.*.png$"))
-names(list_files_junctions_diagram) <- names(junctions_range)
-list_files_junctions_scatter <- list.files(pattern = paste0(sample_prefix, ".junctions_scatter_range_.*.png$"))
-names(list_files_junctions_scatter) <- names(junctions_range)
-plot_psi_can <- paste0(sample_prefix, ".psi_canon_only.corr.png")
-plot_psi_all <- paste0(sample_prefix, ".psi_all_events.corr.png")
-file_psi_can <- paste0(sample_prefix, ".psi_canon_only.tsv")
-file_psi_all <- paste0(sample_prefix, ".psi_all_events.tsv")
-
-file_render_context <- paste0(sample_prefix, ".splicing_report.Rmd")
+file_render_context <- paste0(sample_prefix, ".sc_analysis.Rmd")
 create_html_render(pipeline_name,
                    pipeline_version,
-                   file_summary_reads, 
-                   file_summary_pct,
-                   plot_reads_pct,
-                   plot_barcodes_venn,
-                   file_barcodes_summary,
-                   plot_junctions_venn,
-                   plot_junctions_corr,
-                   plot_junctions_category,
-                   file_junctions_category,
-                   list_files_junctions_diagram,
-                   list_files_junctions_scatter,
-                   plot_psi_can,
-                   plot_psi_all,
-                   file_psi_can,
-                   file_psi_all,
+                   opt$qc_sc_stats, 
+                   opt$qc_sc_rna_plots,
+                   opt$qc_sc_atac_plots,
+                   opt$qc_tf_stats,
+                   opt$qc_tf_cutoff_plots,
                    file_render_context)
 
 rmarkdown::render(file_render_context, clean = TRUE, quiet = TRUE)
