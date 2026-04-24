@@ -1,4 +1,6 @@
 process QC_SC_MULTIOME {
+    tag "${sample_id}_${rep_id}"
+    
     label 'process_single_dynamic_memory'
 
     memory {
@@ -10,7 +12,7 @@ process QC_SC_MULTIOME {
         "${mem * task.attempt} GB"
     }
 
-    publishDir "${params.outdir}/qc_sc/${sample_id}", mode: "copy", overwrite: true
+    publishDir "${params.outdir}/qc_sc/${sample_id}_${rep_id}", mode: "copy", overwrite: true
 
     input:
     tuple val(sample_id), val(rep_id), path(file_raw), path(file_gex), path(file_atac), path(file_atac_tbi), path(file_atac_doublets)

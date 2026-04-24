@@ -1,4 +1,6 @@
 process QC_TF_BARCODES {
+    tag "${sample_id}_${rep_id}"
+    
     label 'process_high_dynamic_memory'
 
     memory {
@@ -10,7 +12,7 @@ process QC_TF_BARCODES {
         "${mem * task.attempt} GB"
     }
 
-    publishDir "${params.outdir}/qc_tf/${sample_id}", mode: "copy", overwrite: true
+    publishDir "${params.outdir}/qc_tf/${sample_id}_${rep_id}", mode: "copy", overwrite: true
 
     input:
     tuple val(sample_id), val(rep_id), path(read_1), path(read_2), path(barcode_csv), path(qced_cells)

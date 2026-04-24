@@ -1,4 +1,6 @@
 process GET_ATAC_DOUBLETS {
+    tag "${sample_id}_${rep_id}"
+    
     label 'process_single_dynamic_memory'
 
     memory {
