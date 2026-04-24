@@ -26,9 +26,9 @@ process QC_SC_MULTIOME {
     def op_ambient = params.del_ambient ? "--del_ambient" : ""
     def op_doublet = params.mark_doublet ? "--mark_doublet --doublet_cells ${file_atac_doublets}" : ""
     """
-    ${projectDir}/scripts/qc_sc_per_sample.R -s ${sample_id}_${rep_id} \
-                                             -r ${file_raw} \
-                                             -g ${file_gex} \
-                                             -a ${file_atac} ${op_ambient} ${op_doublet}
+    ${projectDir}/scripts/qc_sc_multiome.R -s ${sample_id}_${rep_id} \
+                                           -r ${file_raw} \
+                                           -g ${file_gex} \
+                                           -a ${file_atac} ${op_ambient} ${op_doublet}
     """
 }
