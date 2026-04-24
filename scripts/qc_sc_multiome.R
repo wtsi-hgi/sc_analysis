@@ -166,6 +166,9 @@ dt_summary <- data.table(sample_id                  = rep(opt$sample_id, 3),
                                                         median(qc_rna_obj@meta.data$nucleosome_signal),
                                                         median(qc_atac_obj@meta.data$nucleosome_signal)))
 
+dt_summary[, 3:7 := lapply(.SD, as.integer), .SDcols = 3:7]
+dt_summary[, 8:10 := lapply(.SD, round, 2), .SDcols = 8:10]
+
 rm(obj)
 rm(qc_rna_obj)
 invisible(gc(verbose = FALSE))
