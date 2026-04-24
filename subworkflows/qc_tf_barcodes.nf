@@ -13,6 +13,8 @@ workflow qc_tf_barcodes {
     FILTER_TF_BARCODES(ch_qced_tf)
     ch_tf_cutoff_plots = FILTER_TF_BARCODES.out.ch_tf_cutoff_plots
     ch_filtered_tf = FILTER_TF_BARCODES.out.ch_filtered_tf
+    ch_tf_filter_scatter = FILTER_TF_BARCODES.out.ch_tf_filter_scatter
+    ch_tf_filter_boxplot = FILTER_TF_BARCODES.out.ch_tf_filter_boxplot
     if (params.top_n != 0) {
         ch_filtered_tf_top = FILTER_TF_BARCODES.out.ch_filtered_tf_top
     } else {
@@ -24,5 +26,7 @@ workflow qc_tf_barcodes {
     ch_qced_tf
     ch_tf_cutoff_plots
     ch_filtered_tf
+    ch_tf_filter_scatter
+    ch_tf_filter_boxplot
     ch_filtered_tf_top
 }

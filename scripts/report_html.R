@@ -1,10 +1,12 @@
 create_html_render <- function(pipeline_name,
                                pipeline_version,
                                qc_sc_stats,
-                               qc_sc_rna_plots,
-                               qc_sc_atac_plots,
+                               qc_sc_rna_plot,
+                               qc_sc_atac_plot,
                                qc_tf_stats,
-                               qc_tf_cutoff_plots,
+                               qc_tf_cutoff_plot,
+                               qc_tf_scatter_plot,
+                               qc_tf_boxplot_plot,
                                out_render_context)
 {
     pipeline_info <- paste0(pipeline_name, " v", pipeline_version)
@@ -155,13 +157,13 @@ reactable(df, highlight = TRUE, bordered = TRUE, striped = TRUE, compact = TRUE,
 ### 2.2 QC plots of RNA data
 
 ```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "50%", out.width = "50%"}}
-knitr::include_graphics("{qc_sc_rna_plots}", rel_path = FALSE)
+knitr::include_graphics("{qc_sc_rna_plot}", rel_path = FALSE)
 ```
 <br>
 
 ### 2.3 QC plots of ATAC data
 ```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "50%", out.width = "50%"}}
-knitr::include_graphics("{qc_sc_atac_plots}", rel_path = FALSE)
+knitr::include_graphics("{qc_sc_atac_plot}", rel_path = FALSE)
 ```
 <br>
 
@@ -182,7 +184,17 @@ reactable(df, highlight = TRUE, bordered = TRUE, striped = TRUE, compact = TRUE,
 
 ### 3.2 QC plots of TF cutoff
 ```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "50%", out.width = "50%"}}
-knitr::include_graphics("{qc_tf_cutoff_plots}", rel_path = FALSE)
+knitr::include_graphics("{qc_tf_cutoff_plot}", rel_path = FALSE)
+```
+<br>
+
+```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "50%", out.width = "50%"}}
+knitr::include_graphics("{qc_tf_scatter_plot}", rel_path = FALSE)
+```
+<br>
+
+```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "50%", out.width = "50%"}}
+knitr::include_graphics("{qc_tf_boxplot_plot}", rel_path = FALSE)
 ```
 <br>
 

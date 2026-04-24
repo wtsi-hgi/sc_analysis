@@ -21,6 +21,8 @@ process FILTER_TF_BARCODES {
     tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.tf_cutoff_plots.png"), emit: ch_tf_cutoff_plots
     tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.filtered_tfs.tsv"), emit: ch_filtered_tf
     tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.filtered_tfs_top.tsv"), emit: ch_filtered_tf_top, optional: true
+    tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.filtered_tfs.scatter.png"), emit: ch_tf_filter_scatter
+    tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.filtered_tfs.boxplot.png"), emit: ch_tf_filter_boxplot
 
     script:
     """

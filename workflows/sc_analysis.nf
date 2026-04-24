@@ -113,6 +113,8 @@ workflow sc_analysis {
     ch_qced_stats = qc_tf_barcodes.out.ch_qced_stats
     ch_tf_cutoff_plots = qc_tf_barcodes.out.ch_tf_cutoff_plots
     ch_qced_tf = params.top_n == 0 ? qc_tf_barcodes.out.ch_filtered_tf : qc_tf_barcodes.out.ch_filtered_tf_top
+    ch_tf_filter_scatter = qc_tf_barcodes.out.ch_tf_filter_scatter
+    ch_tf_filter_boxplot = qc_tf_barcodes.out.ch_tf_filter_boxplot
 
     /* -- step 3: create output files for python packages -- */
     ch_input = ch_qced_object.join(ch_qced_tf, by: [0,1])
@@ -121,5 +123,7 @@ workflow sc_analysis {
     /* -- step 4: create html report -- */
     ch_input = ch_qced_summary.join(ch_qced_stats, by: [0,1])
                               .join(ch_tf_cutoff_plots, by: [0,1])
+                              .join(ch_tf_filter_scatter, by: [0,1])
+                              .join(ch_tf_filter_boxplot, by: [0,1])
     generate_summary_report(ch_input)
 }
