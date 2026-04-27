@@ -36,11 +36,11 @@ Usage:
 }
 
 /* -- initialising parameters -- */
-params.help             = null
+params.help             = false
 params.version          = false
 params.pipeline_name    = workflow.manifest.name
 params.pipeline_version = workflow.manifest.version
-params.sanger_module    = params.sanger_module               ?: false
+params.sanger_module    = params.sanger_module  ?: false
 
 params.sample_sheet     = null
 params.outdir           = params.outdir         ?: "$PWD"
@@ -54,6 +54,14 @@ params.marker_start     = params.marker_start   ?: 25
 params.marker_end       = params.marker_end     ?: 50
 params.max_mismatch     = params.max_mismatch   ?: 1
 params.top_n            = params.top_n          ?: null
+
+/* -- pipeline info -- */
+log.info """
+=====================================
+${workflow.manifest.name}
+Version: ${workflow.manifest.version}
+=====================================
+"""
 
 /* -- check parameters -- */
 if (params.help) {
