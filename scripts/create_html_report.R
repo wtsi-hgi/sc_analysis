@@ -15,8 +15,8 @@ option_list <- list(make_option(c("-r", "--rscript_dir"),        type = "charact
                     make_option(c("-b", "--qc_tf_boxplot_plot"), type = "character", help = "QC TF boxplot plots files",     default = NULL),
                     make_option(c("-o", "--output_dir"),         type = "character", help = "output directory",                default = getwd()),
                     make_option(c("-p", "--prefix"),             type = "character", help = "output prefix",                   default = NULL),
-                    make_option(c("-w", "--name"),               type = "character", help = "pipeline name",                   default = "sc_analysis"),
-                    make_option(c("-v", "--version"),            type = "character", help = "pipeline version",                default = "dev"))
+                    make_option(c("-w", "--pl_name"),            type = "character", help = "pipeline name",                   default = "sc_analysis"),
+                    make_option(c("-v", "--pl_version"),         type = "character", help = "pipeline version",                default = "dev"))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -53,9 +53,9 @@ sample_prefix <- if(!is.null(opt$prefix)) opt$prefix else opt$sample_id
 # -- reporting -- #
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Creating final html report...")
 
-file_render_context <- paste0(sample_prefix, ".sc_analysis.Rmd")
-create_html_render(pipeline_name,
-                   pipeline_version,
+file_render_context <- paste0(sample_prefix, ".qced_summary.Rmd")
+create_html_render(opt$pl_name,
+                   opt$pl_version,
                    opt$qc_sc_stats, 
                    opt$qc_sc_rna_plot,
                    opt$qc_sc_atac_plot,
