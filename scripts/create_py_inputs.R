@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 quiet_library <- function(pkg) { suppressMessages(suppressWarnings(library(pkg, character.only = TRUE))) }
-packages <- c("optparse", "tidyverse", "data.table", "Seurat", "Signac", "SeuratWrappers", "SeuratDisk")
+packages <- c("optparse", "tidyverse", "data.table", "Seurat", "Signac", "SeuratWrappers", "SeuratDisk", "Matrix")
 invisible(lapply(packages, quiet_library))
 
 option_list <- list(make_option(c("-s", "--sample_id"),  type = "character", help = "sample ID",                   default = NULL),
