@@ -183,17 +183,17 @@ reactable(df, highlight = TRUE, bordered = TRUE, striped = TRUE, compact = TRUE,
 <br>
 
 ### 3.2 QC plots of TF cutoff
-```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "50%", out.width = "50%"}}
+```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "100%", out.width = "100%"}}
 knitr::include_graphics("{qc_tf_cutoff_plot}", rel_path = FALSE)
 ```
 <br>
 
-```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "50%", out.width = "50%"}}
+```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "80%", out.width = "80%"}}
 knitr::include_graphics("{qc_tf_scatter_plot}", rel_path = FALSE)
 ```
 <br>
 
-```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "50%", out.width = "50%"}}
+```{{r, echo = FALSE, fig.show = "hold", fig.align = "center", out.height = "80%", out.width = "80%"}}
 knitr::include_graphics("{qc_tf_boxplot_plot}", rel_path = FALSE)
 ```
 <br>
