@@ -25,9 +25,11 @@ process FILTER_TF_BARCODES {
     tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.filtered_tfs.boxplot.png"), emit: ch_tf_filter_boxplot
 
     script:
+    def op_has_umi = params.has_umi ? "--has_umi" : ""
     """
     ${projectDir}/scripts/filter_tf_barcodes.R -s ${sample_id}_${rep_id} \
                                                -t ${tf_barcode} \
-                                               --top_n ${params.top_n}
+                                               -c ${params.tf_cutoff} \
+                                               --top_n ${params.top_n} ${op_has_umi}
     """
 }

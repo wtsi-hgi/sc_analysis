@@ -29,6 +29,11 @@ process QC_SC_MULTIOME {
     ${projectDir}/scripts/qc_sc_multiome.R -s ${sample_id}_${rep_id} \
                                            -r ${file_raw} \
                                            -g ${file_gex} \
-                                           -a ${file_atac} ${op_ambient} ${op_doublet}
+                                           -a ${file_atac} \
+                                           -c ${params.n_rna_count} \
+                                           -f ${params.n_gene_feature} \
+                                           -m ${params.pct_mito} \
+                                           -t ${params.n_atac_count} \
+                                           -e ${params.tss_enrichment} ${op_ambient} ${op_doublet}
     """
 }

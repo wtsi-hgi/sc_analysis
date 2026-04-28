@@ -22,16 +22,24 @@ Usage:
 
     Optional arguments:
     SC data QC:
+        --n_rna_count                 minimum number of RNA counts, default: 1000
+        --n_gene_feature              minimum number of gene features, default: 200
+        --pct_mito                    maximum percentage of mitochondrial genes, default: 10
+        --n_atac_count                minimum number of ATAC counts, default: 1000
+        --tss_enrichment              minimum TSS enrichment score, default: 2
         --del_ambient                 whether to remove ambient RNA, default: false
         --mark_doublet                whether to mark doublets, default: false
     
     TF barcode QC:
+        --has_umi                     whether the TF barcode has UMI, default: false
         --tf_barcode_len              length of TF barcode, default: 24
         --marker_seq                  marker sequence for TF barcode, default: "GAAAGGACGA"
         --marker_start                start position of marker sequence, default: 25
         --marker_end                  end position of marker sequence, default: 50
         --max_mismatch                maximum mismatch allowed for match sequence, default: 1
         --top_n                       keep top N TFs if 0 keep all, default: 10
+        --tf_cutoff                   minimum cutoff for TF barcode filtering, default: 0
+                                      if set to 0, kmeans clustering will be performed to determine the cutoff
     """
 }
 
@@ -45,15 +53,23 @@ params.sanger_module    = params.sanger_module  ?: false
 params.sample_sheet     = null
 params.outdir           = params.outdir         ?: "$PWD"
 
+params.n_rna_count      = params.n_rna_count    ?: 1000
+params.n_gene_feature   = params.n_gene_feature ?: 200
+params.pct_mito         = params.pct_mito       ?: 10
+params.n_atac_count     = params.n_atac_count   ?: 1000
+params.tss_enrichment   = params.tss_enrichment ?: 2
+
 params.del_ambient      = params.del_ambient    ?: false
 params.mark_doublet     = params.mark_doublet   ?: false
 
+params.has_umi          = params.has_umi        ?: false
 params.tf_barcode_len   = params.tf_barcode_len ?: 24
 params.marker_seq       = params.marker_seq     ?: "GAAAGGACGA"
 params.marker_start     = params.marker_start   ?: 25
 params.marker_end       = params.marker_end     ?: 50
 params.max_mismatch     = params.max_mismatch   ?: 1
-params.top_n            = params.top_n          ?: null
+params.top_n            = params.top_n          ?: 10
+params.tf_cutoff        = params.tf_cutoff      ?: 0
 
 /* -- pipeline info -- */
 log.info """

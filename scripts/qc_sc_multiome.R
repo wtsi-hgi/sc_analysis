@@ -5,16 +5,21 @@ package_2 <- c("Seurat", "Signac", "SeuratWrappers", "SoupX", "DoubletFinder", "
 packages <- c(package_1, package_2)
 invisible(lapply(packages, quiet_library))
 
-option_list <- list(make_option(c("-s", "--sample_id"),  type = "character",     help = "sample ID",                  default = NULL),
-                    make_option(c("-r", "--raw_file"),   type = "character",     help = "raw expression h5 file",     default = NULL),
-                    make_option(c("-g", "--gex_file"),   type = "character",     help = "gene expression h5 file",    default = NULL),
-                    make_option(c("-a", "--atac_file"),  type = "character",     help = "ATAC tsv file",              default = NULL),
-                    make_option(c("-o", "--output_dir"), type = "character",     help = "output directory",           default = getwd()),
-                    make_option(c("-p", "--prefix"),     type = "character",     help = "output prefix",              default = NULL),
-                    make_option("--del_ambient",         action  = "store_true", help = "remove ambient RNAs",        default = FALSE),
-                    make_option("--mark_doublet",        action  = "store_true", help = "mark doublets",              default = FALSE),
-                    make_option("--doublet_rate",        type = "double",        help = "the rate of doublets",       default = 0.008),
-                    make_option("--doublet_cells",       type = "character",     help = "doublet cell barcodes file", default = NULL))
+option_list <- list(make_option(c("-s", "--sample_id"),      type = "character",     help = "sample ID",                                 default = NULL),
+                    make_option(c("-r", "--raw_file"),       type = "character",     help = "raw expression h5 file",                    default = NULL),
+                    make_option(c("-g", "--gex_file"),       type = "character",     help = "gene expression h5 file",                   default = NULL),
+                    make_option(c("-a", "--atac_file"),      type = "character",     help = "ATAC tsv file",                             default = NULL),
+                    make_option(c("-c", "--n_rna_count"),    type = "integer",       help = "minimum number of rna counts",              default = 1000),
+                    make_option(c("-f", "--n_gene_feature"), type = "integer",       help = "minimum number of gene features",           default = 200),
+                    make_option(c("-m", "--pct_mito"),       type = "integer",       help = "minimum percentage of mitochondrial genes", default = 10),
+                    make_option(c("-t", "--n_atac_count"),   type = "integer",       help = "minimum number of atac counts",             default = 1000),
+                    make_option(c("-e", "--tss_enrichment"), type = "integer",       help = "minimum score of tss enrichment ",          default = 2),
+                    make_option(c("-o", "--output_dir"),     type = "character",     help = "output directory",                          default = getwd()),
+                    make_option(c("-p", "--prefix"),         type = "character",     help = "output prefix",                             default = NULL),
+                    make_option("--del_ambient",             action  = "store_true", help = "remove ambient RNAs",                       default = FALSE),
+                    make_option("--mark_doublet",            action  = "store_true", help = "mark doublets",                             default = FALSE),
+                    make_option("--doublet_rate",            type = "double",        help = "the rate of doublets",                      default = 0.008),
+                    make_option("--doublet_cells",           type = "character",     help = "doublet cell barcodes file",                default = NULL))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -88,17 +93,17 @@ obj$qc_rna_status <- "failed"
 obj$qc_atac_status <- "failed"
 obj[["percent.mt"]] <- PercentageFeatureSet(obj, pattern = "^MT-")
 
-nFeature_low  <- 200
+nFeature_low  <- opt$n_gene_feature
 nFeature_high <- quantile(obj$nFeature_RNA, 0.99)
 
-nCount_low  <- 1000
+nCount_low  <- opt$n_rna_count
 nCount_high <- quantile(obj$nCount_RNA, 0.99)
 
 qc_rna_obj <- subset(obj, subset = nFeature_RNA > nFeature_low & 
                                    nFeature_RNA < nFeature_high &
                                    nCount_RNA > nCount_low &
                                    nCount_RNA < nCount_high &
-                                   percent.mt < 10)
+                                   percent.mt < opt$pct_mito)
 qc_rna_obj$qc_rna_status <- "passed"
 obj$qc_rna_status[colnames(qc_rna_obj)] <- "passed"
 
@@ -118,10 +123,10 @@ obj$qc_atac_status <- "failed"
 qc_rna_obj <- NucleosomeSignal(qc_rna_obj)
 qc_rna_obj <- TSSEnrichment(qc_rna_obj)
 
-nCount_ATAC_low  <- 1000
+nCount_ATAC_low  <- opt$n_atac_count
 nCount_ATAC_high <- quantile(qc_rna_obj$nCount_ATAC, 0.99)
 
-tss_enrichment_low  <- 2
+tss_enrichment_low  <- opt$tss_enrichment
 
 qc_atac_obj <- subset(qc_rna_obj, subset = nCount_ATAC > nCount_ATAC_low & 
                                            nCount_ATAC < nCount_ATAC_high & 
