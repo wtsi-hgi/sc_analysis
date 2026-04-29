@@ -53,7 +53,7 @@ sample_prefix <- if(!is.null(opt$prefix)) opt$prefix else opt$sample_id
 # -- reporting -- #
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Creating final html report...")
 
-file_render_context <- paste0(sample_prefix, ".qced_summary.Rmd")
+file_render_context <- paste0(sample_prefix, ".qc_summary.Rmd")
 create_html_render(opt$pl_name,
                    opt$pl_version,
                    opt$qc_sc_stats, 

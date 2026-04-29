@@ -4,10 +4,10 @@ workflow generate_summary_report {
 
     main:
     CREATE_HTML_REPORT(ch_input)
-    ch_qced_summary = CREATE_HTML_REPORT.out.ch_qced_summary
+    ch_qc_summary = CREATE_HTML_REPORT.out.ch_qc_summary
 
     emit:
-    ch_qced_summary
+    ch_qc_summary
 }
 
 process CREATE_HTML_REPORT {
@@ -21,7 +21,7 @@ process CREATE_HTML_REPORT {
           val(qc_tf_stats), val(qc_tf_cutoff_plot), val(qc_tf_scatter_plot), val(qc_tf_boxplot_plot)
 
     output:
-    tuple val(sample_id), path("${sample_id}_${rep_id}.qced_summary.html"), emit: ch_qced_summary
+    tuple val(sample_id), path("${sample_id}_${rep_id}.qc_summary.html"), emit: ch_qc_summary
 
     script:
     """
