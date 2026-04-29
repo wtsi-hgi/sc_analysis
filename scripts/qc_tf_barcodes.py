@@ -283,7 +283,7 @@ if __name__ == "__main__":
     parser.add_argument("--has_umi",        action = "store_true",              help = "whether R1 reads have umi sequences")
     parser.add_argument("--output_dir",     type = str, default = os.getcwd(),  help = "output directory")
     parser.add_argument("--output_prefix",  type = str, default = '',           help = "output prefix")
-    parser.add_argument("--chunk_size",     type = int, default = 100000,       help = "chunk size for processing reads")
+    parser.add_argument("--chunk_size",     type = int, default = 1000000,      help = "chunk size for processing reads")
     parser.add_argument("--threads",        type = int, default = 40,           help = "number of threads")
 
     args, unknown = parser.parse_known_args()
