@@ -1,4 +1,4 @@
-process CREATE_PY_INPUTS {
+process CREATE_OUTPUTS {
     tag "${sample_id}_${rep_id}"
 
     label 'process_single_dynamic_memory'
@@ -12,7 +12,7 @@ process CREATE_PY_INPUTS {
         "${mem * task.attempt} GB"
     }
     
-    publishDir "${params.outdir}/qc_py_inputs/${sample_id}_${rep_id}", mode: "copy", overwrite: true
+    publishDir "${params.outdir}/qc_outputs/${sample_id}_${rep_id}", mode: "copy", overwrite: true
 
     input:
     tuple val(sample_id), val(rep_id), path(qced_rds), path(qced_tf)
@@ -22,7 +22,7 @@ process CREATE_PY_INPUTS {
     
     script:
     """
-    ${projectDir}/scripts/create_py_inputs.R -s ${sample_id}_${rep_id} -r ${qced_rds} -c ${qced_tf}
+    ${projectDir}/scripts/create_outputs.R -s ${sample_id}_${rep_id} -r ${qced_rds} -c ${qced_tf}
 
     gzip ${sample_id}_${rep_id}_py_inputs/*/*.tsv
     gzip ${sample_id}_${rep_id}_py_inputs/*/*.mtx

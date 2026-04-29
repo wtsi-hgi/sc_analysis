@@ -2,7 +2,7 @@
 
 /* -- load modules -- */
 include { NOTE_CMD }                from "$projectDir/modules/local/init_workflow/main"
-include { CREATE_PY_INPUTS }        from "$projectDir/modules/local/create_py_inputs/main"
+include { CREATE_OUTPUTS }          from "$projectDir/modules/local/create_outputs/main"
 
 /* -- load subworkflows -- */
 include { check_input_files }       from "$projectDir/subworkflows/check_input_files.nf"
@@ -142,7 +142,7 @@ workflow sc_analysis {
 
     /* -- step 3: create output files for python packages -- */
     ch_input = ch_qced_object.join(ch_qced_tf, by: [0,1])
-    CREATE_PY_INPUTS(ch_input)
+    CREATE_OUTPUTS(ch_input)
 
     /* -- step 4: create html report -- */
     ch_input = ch_qced_summary.join(ch_qced_stats, by: [0,1])
