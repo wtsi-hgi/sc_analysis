@@ -18,7 +18,7 @@ process CREATE_OUTPUTS {
     tuple val(sample_id), val(rep_id), path(qced_rds), path(qced_tf)
     
     output:
-    tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.qced.rds"), emit: ch_qeced_rds
+    tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.qc_obj_tf.rds"), emit: ch_qc_obj_tf
     tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}_py_inputs"), emit: ch_py_inputs
     
     script:

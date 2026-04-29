@@ -80,7 +80,7 @@ rm(tf_mat)
 invisible(gc(verbose = FALSE))
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "creating rds output file ...")
-saveRDS(obj, paste0(sample_prefix, ".qced.rds"))
+saveRDS(obj, paste0(sample_prefix, ".qc_obj_tf.rds"))
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "creating python readable output files ...")
 tmp_dir <- paste0(sample_prefix, "_py_inputs")
