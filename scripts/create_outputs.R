@@ -79,6 +79,10 @@ rm(tf_counts)
 rm(tf_mat)
 invisible(gc(verbose = FALSE))
 
+message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "creating doublets output file ...")
+qc_doublet_status <- data.table(cell_id = names(obj$qc_doublet_status), status  = obj$qc_doublet_status, stringsAsFactors = FALSE)
+fwrite(qc_doublet_status, paste0(sample_prefix, ".qc_doublet_status.tsv"), sep = "\t", col.names = TRUE)
+
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "creating rds output file ...")
 saveRDS(obj, paste0(sample_prefix, ".qc_obj_tf.rds"))
 
