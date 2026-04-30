@@ -184,7 +184,7 @@ if(opt$top_n > 0)
                                   measure.vars = c("mean_count", "median_count"),
                                   variable.name = "count_type", value.name = "count_value")
 
-    png(paste0(sample_prefix, ".filtered_tfs_top.boxplot.png"), width = 2000, height = 1600, res = 150)                              
+    png(paste0(sample_prefix, ".filtered_tfs_top.boxplot.png"), width = 1600, height = 1200, res = 150)                              
     ggplot(tf_counts_top_boxplot, aes(x = factor(n_tf), y = count_value, fill = count_type)) +
         geom_boxplot(outlier.size = 0.5, position = position_dodge(width = 0.8), outlier.colour = "darkgrey", linewidth = 0.1) +
         scale_y_log10() +
