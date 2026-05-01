@@ -22,6 +22,7 @@ process QC_TF_BARCODES {
     tuple val(sample_id), val(rep_id), path("${sample_id}_${rep_id}.tf_barcodes.tsv"), emit: ch_qced_tf
 
     script:
+    def op_has_umi = params.has_umi ? "--has_umi" : ""
     """
     python ${projectDir}/scripts/qc_tf_barcodes.py --reads          ${read_1},${read_2} \
                                                    --tf_barcode     ${barcode_csv} \
@@ -31,6 +32,6 @@ process QC_TF_BARCODES {
                                                    --marker_start   ${params.marker_start} \
                                                    --marker_end     ${params.marker_end} \
                                                    --max_mismatch   ${params.max_mismatch} \
-                                                   --output_prefix  ${sample_id}_${rep_id}
+                                                   --output_prefix  ${sample_id}_${rep_id} ${op_has_umi}
     """
 }

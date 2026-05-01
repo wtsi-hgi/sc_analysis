@@ -31,6 +31,7 @@ Usage:
         --mark_doublet                whether to mark doublets, default: false
     
     TF barcode QC:
+        --skip_tf_qc                  whether to run TF barcode QC, default: false
         --has_umi                     whether the TF barcode has UMI, default: false
         --tf_barcode_len              length of TF barcode, default: 24
         --marker_seq                  marker sequence for TF barcode, default: "GAAAGGACGA"
@@ -62,6 +63,7 @@ params.tss_enrichment   = params.tss_enrichment ?: 2
 params.del_ambient      = params.del_ambient    ?: false
 params.mark_doublet     = params.mark_doublet   ?: false
 
+params.skip_tf_qc       = params.skip_tf_qc     ?: false
 params.has_umi          = params.has_umi        ?: false
 params.tf_barcode_len   = params.tf_barcode_len ?: 24
 params.marker_seq       = params.marker_seq     ?: "GAAAGGACGA"
