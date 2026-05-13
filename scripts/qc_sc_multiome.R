@@ -144,35 +144,23 @@ p <- VlnPlot(qc_rna_obj,
              ncol = 3)
 ggsave(plot_file, p, width = 10, height = 8)
 
-dt_summary <- data.table(sample_id                  = rep(opt$sample_id, 3),
-                         qc_type                    = c("raw", "after_qc_rna", "after_qc_atac"),
-                         n_reads_rna                = c(sum(obj@meta.data$nCount_RNA), 
-                                                        sum(qc_rna_obj@meta.data$nCount_RNA),
-                                                        sum(qc_atac_obj@meta.data$nCount_RNA)),
-                         n_reads_atac               = c(sum(obj@meta.data$nCount_ATAC), 
-                                                        sum(qc_rna_obj@meta.data$nCount_ATAC),
-                                                        sum(qc_atac_obj@meta.data$nCount_ATAC)),
-                         n_cells                    = c(nrow(obj@meta.data), 
-                                                        nrow(qc_rna_obj@meta.data),
-                                                        nrow(qc_atac_obj@meta.data)),
-                         n_features_per_cell_median = c(median(obj@meta.data$nFeature_RNA), 
-                                                        median(qc_rna_obj@meta.data$nFeature_RNA),
-                                                        median(qc_atac_obj@meta.data$nFeature_RNA)),
-                         n_reads_per_cell_median    = c(median(obj@meta.data$nCount_RNA), 
-                                                        median(qc_rna_obj@meta.data$nCount_RNA),
-                                                        median(qc_atac_obj@meta.data$nCount_RNA)),
-                         pct_mito_per_cell_median   = c(median(obj@meta.data$percent.mt), 
-                                                        median(qc_rna_obj@meta.data$percent.mt),
-                                                        median(qc_atac_obj@meta.data$percent.mt)),
-                         tss_enrichment_median      = c(NA, 
-                                                        median(qc_rna_obj@meta.data$TSS.enrichment),
-                                                        median(qc_atac_obj@meta.data$TSS.enrichment)),
-                         nucleosome_signal_median   = c(NA,
-                                                        median(qc_rna_obj@meta.data$nucleosome_signal),
-                                                        median(qc_atac_obj@meta.data$nucleosome_signal)))
+dt_summary <- data.table(qc_type                  = c("raw",                            "after_qc_rna",                               "after_qc_atac"),
+                         n_reads_rna              = c(sum(obj@meta.data$nCount_RNA),    sum(qc_rna_obj@meta.data$nCount_RNA),         sum(qc_atac_obj@meta.data$nCount_RNA)),
+                         n_reads_atac             = c(sum(obj@meta.data$nCount_ATAC),   sum(qc_rna_obj@meta.data$nCount_ATAC),        sum(qc_atac_obj@meta.data$nCount_ATAC)),
+                         n_cells                  = c(nrow(obj@meta.data),              nrow(qc_rna_obj@meta.data),                   nrow(qc_atac_obj@meta.data)),
+                         n_features_per_cell_mean = c(mean(obj@meta.data$nFeature_RNA), mean(qc_rna_obj@meta.data$nFeature_RNA),      mean(qc_atac_obj@meta.data$nFeature_RNA)),
+                         n_reads_per_cell_mean    = c(mean(obj@meta.data$nCount_RNA),   mean(qc_rna_obj@meta.data$nCount_RNA),        mean(qc_atac_obj@meta.data$nCount_RNA)),
+                         pct_mito_per_cell_mean   = c(mean(obj@meta.data$percent.mt),   mean(qc_rna_obj@meta.data$percent.mt),        mean(qc_atac_obj@meta.data$percent.mt)),
+                         tss_enrichment_mean      = c(NA,                               mean(qc_rna_obj@meta.data$TSS.enrichment),    mean(qc_atac_obj@meta.data$TSS.enrichment)),
+                         nucleosome_signal_mean   = c(NA,                               mean(qc_rna_obj@meta.data$nucleosome_signal), mean(qc_atac_obj@meta.data$nucleosome_signal)))
 
-dt_summary[, 3:7 := lapply(.SD, as.integer), .SDcols = 3:7]
-dt_summary[, 8:10 := lapply(.SD, round, 2), .SDcols = 8:10]
+dt_summary[, 2:6 := lapply(.SD, as.integer), .SDcols = 3:7]
+dt_summary[, 7:9 := lapply(.SD, round, 2), .SDcols = 8:10]
+
+dt_summary_t <- transpose(dt_summary[, -1])
+setnames(dt_summary_t, dt_summary$qc_type)
+dt_summary_t[, (opt$sample_id) := names(dt_summary)[-1]]
+setcolorder(dt_summary_t, c(opt$sample_id, dt_summary$qc_type))
 
 rm(obj)
 rm(qc_rna_obj)
@@ -218,7 +206,7 @@ if(opt$mark_double)
 }
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "Sample QC: ", opt$sample_id, " --> creating output files ...")
-fwrite(dt_summary, file = paste0(sample_prefix, ".qc_summary.tsv"), sep = "\t")
+fwrite(dt_summary_t, file = paste0(sample_prefix, ".qc_summary.tsv"), sep = "\t")
 
 cell_barcodes <- data.table(barcode = colnames(qc_atac_obj))
 cell_barcodes[, barcode := sub("-1$", "", barcode)]
