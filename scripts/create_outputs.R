@@ -68,8 +68,14 @@ tf_mat <- as.data.frame(tf_mat)
 rownames(tf_mat) <- tf_mat$tf_name
 tf_mat$tf_name <- NULL
 
-common_cells <- intersect(colnames(tf_mat), colnames(obj))
-obj <- subset(obj, cells = common_cells)
+# common_cells <- intersect(colnames(tf_mat), colnames(obj))
+# obj <- subset(obj, cells = common_cells)
+
+missing_cells <- setdiff(colnames(obj), colnames(tf_mat))
+if(length(missing_cells) > 0)
+{
+    tf_mat[, missing_cells] <- 0
+}
 tf_mat <- as.matrix(tf_mat[, colnames(obj)])
 
 message(format(Sys.time(), "[%Y-%m-%d %H:%M:%S] "), "creating final object ...")
