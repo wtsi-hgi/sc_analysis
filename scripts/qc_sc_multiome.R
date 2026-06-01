@@ -154,8 +154,8 @@ dt_summary <- data.table(qc_type                  = c("raw",                    
                          tss_enrichment_mean      = c(NA,                               mean(qc_rna_obj@meta.data$TSS.enrichment),    mean(qc_atac_obj@meta.data$TSS.enrichment)),
                          nucleosome_signal_mean   = c(NA,                               mean(qc_rna_obj@meta.data$nucleosome_signal), mean(qc_atac_obj@meta.data$nucleosome_signal)))
 
-dt_summary[, 2:6 := lapply(.SD, as.integer), .SDcols = 3:7]
-dt_summary[, 7:9 := lapply(.SD, round, 2), .SDcols = 8:10]
+dt_summary[, 2:6 := lapply(.SD, as.integer), .SDcols = 2:6]
+dt_summary[, 7:9 := lapply(.SD, round, 2), .SDcols = 7:9]
 
 dt_summary_t <- transpose(dt_summary[, -1])
 setnames(dt_summary_t, dt_summary$qc_type)
